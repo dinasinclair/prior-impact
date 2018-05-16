@@ -124,25 +124,18 @@ $(document).ready(function () {
 </div>
 
 
-<p>Okay folks so the goal here is to understand this stuff, whoo!!</p>
-<pre class="r"><code># Set up workspace
-rm(list = ls())
-set.seed(1)
-
-# Load packages
-# require(data.table)
-# library(ggplot2)
-# require(Rcpp)
-# require(RcppEigen) 
-# library(gridExtra)
-# library(dplyr)
-# library(splitstackshape)
-# library(sem)
-# library(plyr)
-# library(reshape)
-# library(matrixStats)
-# library(metafor)
-# library(stringr)</code></pre>
+<div id="basic-definitions" class="section level2">
+<h2>Basic Definitions</h2>
+<p>What we’re working with here, drawing heavily from the HMCWG paper section 2.1:</p>
+<ul>
+<li><span class="math inline">\(Y_i\)</span> is the point estimate in study <span class="math inline">\(i\)</span></li>
+<li><span class="math inline">\(\theta_i\)</span> is the true effect in study <span class="math inline">\(i\)</span></li>
+<li><span class="math inline">\(\mu\)</span> is the unknown mean of the distribution of <span class="math inline">\(\theta_i\)</span></li>
+<li><span class="math inline">\(\tau^2\)</span> is the unknown variance of the distribution of <span class="math inline">\(\theta_i\)</span></li>
+</ul>
+<p><span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span> are known as <em>hyperparameters</em> since they model another one of our model variables, <span class="math inline">\(\theta_i\)</span>.</p>
+<p><span class="math display">\[\theta_i \sim N(\mu, \tau^2)\]</span></p>
+</div>
 <div id="first-helper-function-suff-theta" class="section level2">
 <h2>First helper function: Suff Theta</h2>
 <pre class="r"><code>suff_theta &lt;- function(Y, mu, tau2, sigma2){
@@ -177,6 +170,7 @@ Which mathematically is saying given <span class="math inline">\(Y, \sigma^2\)</
 \omega_i &amp;= \sum \frac{1}{\sigma^2 + \tau^2} \\
 \omega &amp;= \frac{1}{\omega_i}
 \end{align*}\]</span>
+<p>Eva says the <span class="math inline">\(\omega\)</span> stuff is just to help with variance. Would that mean that <span class="math display">\[V_\mu =\frac{1}{\sum \frac{1}{\sigma^2 + \tau^2}}=\omega\]</span> which matches up to equation (10) in section 2.2. Also from equation (10), we get that <span class="math display">\[\hat{\mu} = \frac{\lambda}{\omega_i} = \lambda \omega\]</span> so indeed, having <span class="math inline">\(\lambda\)</span> and <span class="math inline">\(\omega\)</span> is sufficient to derive <span class="math inline">\(\mu\)</span>.</p>
 </div>
 <div id="third-helper-function-post-tau-squared" class="section level2">
 <h2>Third helper function: Post Tau Squared</h2>

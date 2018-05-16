@@ -4,8 +4,7 @@ author: "Dina Sinclair"
 date: "May 15, 2018"
 output: html_document
 ---
-Okay folks so the goal here is to understand this stuff, whoo!!
-```{r}
+```{r, echo=FALSE }
 # Set up workspace
 rm(list = ls())
 set.seed(1)
@@ -25,6 +24,22 @@ set.seed(1)
 # library(metafor)
 # library(stringr)
 ```
+## Basic Definitions
+
+What we're working with here, drawing heavily from the HMCWG paper section 2.1:
+
+
+* $Y_i$ is the point estimate in study $i$
+* $\theta_i$ is the true effect in study $i$
+* $\mu$ is the unknown mean of the distribution of $\theta_i$ 
+* $\tau^2$ is the unknown variance of the distribution of $\theta_i$
+
+
+$\mu$ and $\tau^2$ are known as *hyperparameters* since they model another one of our model variables, $\theta_i$.
+
+$$\theta_i \sim N(\mu, \tau^2)$$
+
+
 
 ##First helper function: Suff Theta
 ```{r}
@@ -62,6 +77,12 @@ Which mathematically is saying given $Y, \sigma^2$ and $\tau^2$,
 \omega_i &= \sum \frac{1}{\sigma^2 + \tau^2} \\
 \omega &= \frac{1}{\omega_i}
 \end{align*}
+
+Eva says the $\omega$ stuff is just to help with variance. Would that mean that 
+$$V_\mu =\frac{1}{\sum \frac{1}{\sigma^2 + \tau^2}}=\omega$$
+which matches up to equation (10) in section 2.2. Also from equation (10), we get that
+$$\hat{\mu} = \frac{\lambda}{\omega_i} = \lambda \omega$$
+so indeed, having $\lambda$ and $\omega$ is sufficient to derive $\mu$.
 
 ##Third helper function: Post Tau Squared
 ```{r}
