@@ -39,8 +39,6 @@ $\mu$ and $\tau^2$ are known as *hyperparameters* since they model another one o
 
 $$\theta_i \sim N(\mu, \tau^2)$$
 
-
-
 ##First helper function: Suff Theta
 ```{r}
 suff_theta <- function(Y, mu, tau2, sigma2){
@@ -57,6 +55,11 @@ suff_theta <- function(Y, mu, tau2, sigma2){
   return(list(mean = mean, var = var))
 }
 ```
+Okay. So here we're looking at a matrix divided by another matrix to get a mean, specifically
+$$ mean = \frac{A \tau^2 + B \mu}{B + \tau^2}$$
+And a second one for variance
+$$var = \frac{B\tau^2}{B+\tau^2} = \frac{1}{\frac{1}{\tau^2}+\frac{1}{B}}$$
+where $A$ is a matrix form of $Y$ and $B$ is a matrix form of $\sigma^2$. These are the same as the two equations (8) in section 2.2 of HMCWG.
 
 ##Second helper function: Suff Mu
 Here's the code:

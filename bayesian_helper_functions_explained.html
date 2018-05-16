@@ -151,6 +151,7 @@ $(document).ready(function () {
   #in matrix with nrow = # of e_i and ncol = #samples
   return(list(mean = mean, var = var))
 }</code></pre>
+<p>Okay. So here we’re looking at a matrix divided by another matrix to get a mean, specifically <span class="math display">\[ mean = \frac{A \tau^2 + B \mu}{B + \tau^2}\]</span> And a second one for variance <span class="math display">\[var = \frac{B\tau^2}{B+\tau^2} = \frac{1}{\frac{1}{\tau^2}+\frac{1}{B}}\]</span> where <span class="math inline">\(A\)</span> is a matrix form of <span class="math inline">\(Y\)</span> and <span class="math inline">\(B\)</span> is a matrix form of <span class="math inline">\(\sigma^2\)</span>. These are the same as the two equations (8) in section 2.2 of HMCWG.</p>
 </div>
 <div id="second-helper-function-suff-mu" class="section level2">
 <h2>Second helper function: Suff Mu</h2>
