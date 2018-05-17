@@ -200,6 +200,27 @@ post_tau2 &lt;- function(Y, sigma2, tau2, n.sims){
   # return all the selected tau2 and mean (beta) and omega (for beta). 
   return(list(tau2 = tau2, mean = mean, omega = omega))
 }</code></pre>
+<p>This is looking for <span class="math inline">\(p(\mu | \tau, Y)\)</span>.</p>
+<p><span class="math inline">\(\lambda\)</span> and <span class="math inline">\(\omega\)</span> are vectors of length <span class="math inline">\(\tau^2\)</span>, start off as full of NAs.</p>
+<p>What is the ‘tau grid’? For every tau, we’re going to calculate a new <span class="math inline">\(\lambda_I\)</span> and <span class="math inline">\(\omega_I\)</span></p>
+<ol style="list-style-type: decimal">
+<li>Calculate sufficient <span class="math inline">\(\mu\)</span> for given <span class="math inline">\(\tau_i\)</span>, get <span class="math inline">\(\omega_I\)</span> and <span class="math inline">\(\lambda_I\)</span></li>
+<li>Calculate <span class="math inline">\(\lambda_i = \lambda_I \omega_I\)</span> <strong>wait, isn’t that equal to <span class="math inline">\(\mu\)</span>?</strong></li>
+<li>Calculate <span class="math inline">\(\omega_i = \omega_I\)</span></li>
+<li>Then find <span class="math inline">\(\log(p)\)</span> using</li>
+</ol>
+<p><span class="math display">\[\log(p)_i = \frac 1 2 \log(\omega_i) - \frac 1 2 \sum\log(\sigma^2+\tau^2_i)
+-\frac 1 2 \sum \frac{(Y-\lambda_i)^2}{\sigma^2 + \tau^2_i}\]</span></p>
+<p>This is almost equation (15) of section 2.2, if we take the log of both sides, do some algebra, and remember that <span class="math inline">\(\hat{\mu}=\lambda_i\)</span> and <span class="math inline">\(V_\mu = \omega_i\)</span>. Specifically,</p>
+<span class="math display">\[\begin{align*}
+p(\tau|Y) &amp;\propto p(\tau)V_\mu^{1/2}\Pi_i(\sigma^2_i + \tau^2)^{-1/2} \exp \left(-\frac{(Y-\hat{\mu})^2}{2(\sigma^2_i+\tau^2)}\right) \\
+\log(p(\tau|Y)) &amp;\propto 
+\log(p(\tau)) + \frac 1 2 \log(V_\mu)
+-\frac 1 2 \sum_i\log(\sigma^2_i + \tau^2) 
+-\frac 1 2 \sum_i \frac{(Y-\hat{\mu})^2}{\sigma^2_i+\tau^2}
+\end{align*}\]</span>
+<p>Question: <strong>What happens to the <span class="math inline">\(\log(p(\tau))\)</span> term?</strong></p>
+<p><strong>Then you have some normalization going on?</strong> <span class="math display">\[\log(p) \leftarrow \log(p) - max(\log(p))\]</span> <strong>Also why the index command?</strong></p>
 </div>
 <div id="fourth-helper-function-post-mix-s" class="section level2">
 <h2>Fourth helper function: Post Mix S</h2>

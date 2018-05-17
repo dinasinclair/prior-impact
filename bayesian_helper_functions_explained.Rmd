@@ -115,6 +115,36 @@ post_tau2 <- function(Y, sigma2, tau2, n.sims){
   return(list(tau2 = tau2, mean = mean, omega = omega))
 }
 ```
+This is looking for $p(\mu | \tau, Y)$. 
+
+$\lambda$ and $\omega$ are vectors of length $\tau^2$, start off as full of NAs.
+
+What is the 'tau grid'? For every tau, we're going to calculate a new $\lambda_I$ and $\omega_I$
+
+1. Calculate sufficient $\mu$ for given $\tau_i$, get $\omega_I$ and $\lambda_I$
+2. Calculate $\lambda_i = \lambda_I \omega_I$ **wait, isn't that equal to $\mu$?**
+3. Calculate $\omega_i = \omega_I$
+4. Then find $\log(p)$ using
+
+$$\log(p)_i = \frac 1 2 \log(\omega_i) - \frac 1 2 \sum\log(\sigma^2+\tau^2_i)
+-\frac 1 2 \sum \frac{(Y-\lambda_i)^2}{\sigma^2 + \tau^2_i}$$ 
+
+This is almost equation (15) of section 2.2, if we take the log of both sides, do some algebra, and remember that $\hat{\mu}=\lambda_i$ and $V_\mu = \omega_i$. Specifically,
+
+\begin{align*}
+p(\tau|Y) &\propto p(\tau)V_\mu^{1/2}\Pi_i(\sigma^2_i + \tau^2)^{-1/2} \exp \left(-\frac{(Y-\hat{\mu})^2}{2(\sigma^2_i+\tau^2)}\right) \\
+\log(p(\tau|Y)) &\propto 
+\log(p(\tau)) + \frac 1 2 \log(V_\mu)
+-\frac 1 2 \sum_i\log(\sigma^2_i + \tau^2) 
+-\frac 1 2 \sum_i \frac{(Y-\hat{\mu})^2}{\sigma^2_i+\tau^2}
+\end{align*}
+
+Question: **What happens to the $\log(p(\tau))$ term?**
+
+**Then you have some normalization going on?**
+$$\log(p) \leftarrow \log(p) - max(\log(p))$$
+**Also why the index command?**
+
 
 ##Fourth helper function: Post Mix S
 ```{r}
