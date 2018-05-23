@@ -1,0 +1,23 @@
+---
+title: "BasicBayesian"
+author: "Dina Sinclair"
+date: "May 23, 2018"
+output: html_document
+---
+
+```{r}
+library("rstan")
+```
+
+```{r}
+basic_dat <- list(J = 3,
+                    I =3,
+                    y = c(c(1,2,3),c(3,2,4),c(2,1,0.5)),
+                    sigmaSq = c(c(1,4,0.3),c(0.3,0.2,5),c(0.1,1,0.5))
+)
+```
+
+```{r}
+fit <- stan(file = 'basicBayesian.stan', data = basic_dat, 
+            iter = 100, chains = 4)
+```
