@@ -5,19 +5,57 @@ date: "May 23, 2018"
 output: html_document
 ---
 
-```{r}
+```{r, warning = FALSE}
 library("rstan")
 ```
 
+First, declare the data. This seems to be where my current problem is coming
+from - I can't figure out the right way to declare a matrix so that rstan will
+accept it. [I'm getting the same error as is happening here](https://github.com/stan-dev/rstan/issues/384) but I haven't been able to fix it.
+
+The values I have inputted are currently completely arbitrary, with
+
+ * $J$ is the number of individuals per study (**Question: Can $J$ be constant across all studies?**)
+ * $I$ is the number of studies
+ * $Y_{i,j}$ is the data points from study $i$, individual $j$
+ * $\sigma^2_{i,j}$ is the sampling variance of study $i$, individual $j$ (**Question: why does this vary by $j$ as well as by $i$?**)
 ```{r}
 basic_dat <- list(J = 3,
                     I =3,
-                    y = c(c(1,2,3),c(3,2,4),c(2,1,0.5)),
-                    sigmaSq = c(c(1,4,0.3),c(0.3,0.2,5),c(0.1,1,0.5))
+                    y = list(matrix(c(1,2,3,3,2,4,2,1,0.5),3,3)),
+                    sigmaSq = list(matrix(c(1,.12,3,.3,2,.14,.2,.1,0.5),3,3))
 )
 ```
 
-```{r}
+Here I run the model, but am curently getting an error (link above) about what I think is the way I'm inputting $Y$ and $\sigma^2$ matrices.
+```{r, eval = FALSE}
 fit <- stan(file = 'basicBayesian.stan', data = basic_dat, 
             iter = 100, chains = 4)
 ```
+
+####DIAGNOSTIC(S) FROM PARSER:
+
+**Warning (non-fatal):**
+Left-hand side of sampling statement (~) may contain a non-linear transform of a parameter or local variable.
+If it does, you need to include a target += statement with the log absolute determinant of the Jacobian of the transform.
+Left-hand-side of sampling statement:
+    theta[i] ~ normal(...)
+
+recompiling to avoid crashing R session
+In file included from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config.hpp:39:0,
+                 from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/math/tools/config.hpp:13,
+                 from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core/var.hpp:7,
+                 from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core/gevv_vvv_vari.hpp:5,
+                 from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core.hpp:12,
+                 from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
+                 from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
+                 from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
+                 from file8664f972cf5.cpp:8:
+C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: "BOOST_NO_CXX11_RVALUE_REFERENCES" redefined
+ #  define BOOST_NO_CXX11_RVALUE_REFERENCES
+ ^
+<command-line>:0:0: note: this is the location of the previous definition
+is.na() applied to non-(list or vector) of type 'NULL'data with name Y is not numeric and not usedError in new_CppObject_xp(fields$.module, fields$.pointer, ...) : 
+  Exception: variable does not exist; processing stage=data initialization; variable name=Y; base type=double  (in 'model8664a74417a_basicBayesian' at line 5)
+
+**failed to create the sampler; sampling not done**
