@@ -140,20 +140,24 @@ $(document).ready(function () {
 <li><span class="math inline">\(Y_{i,j}\)</span> is the data points from study <span class="math inline">\(i\)</span>, individual <span class="math inline">\(j\)</span></li>
 <li><span class="math inline">\(\sigma^2_{i,j}\)</span> is the sampling variance of study <span class="math inline">\(i\)</span>, individual <span class="math inline">\(j\)</span> (<strong>Question: why does this vary by <span class="math inline">\(j\)</span> as well as by <span class="math inline">\(i\)</span>?</strong>)</li>
 </ul>
-<pre class="r"><code>basic_dat &lt;- list(J = 3,
+<pre class="r"><code># basic_dat &lt;- list(J = 3,
+#                     I =3,
+#                     Y = list(matrix(c(1,2,3,3,2,4,2,1,0.5),3,3)),
+#                     sigmaSq = list(matrix(c(1,.12,3,.3,2,.14,.2,.1,0.5),3,3))
+# )
+basic_dat &lt;- list(J = 3,
                     I =3,
-                    y = list(matrix(c(1,2,3,3,2,4,2,1,0.5),3,3)),
-                    sigmaSq = list(matrix(c(1,.12,3,.3,2,.14,.2,.1,0.5),3,3))
-)</code></pre>
+                    Y = list(c(1,4,2),c(4,2,5),c(.1,.4,.4)),
+                    sigmaSq = list(c(.3,.2,.6),c(1,2,3),c(.3,.3,.1))
+)
+# basic_dat &lt;- list(J = 1,
+#                     I =1,
+#                     Y = c(3),
+#                     sigmaSq = c(2)
+# )</code></pre>
 <p>Here I run the model, but am curently getting an error (link above) about what I think is the way I’m inputting <span class="math inline">\(Y\)</span> and <span class="math inline">\(\sigma^2\)</span> matrices.</p>
 <pre class="r"><code>fit &lt;- stan(file = 'basicBayesian.stan', data = basic_dat, 
-            iter = 100, chains = 4)</code></pre>
-<div id="diagnostics-from-parser" class="section level4">
-<h4>DIAGNOSTIC(S) FROM PARSER:</h4>
-<p><strong>Warning (non-fatal):</strong> Left-hand side of sampling statement (~) may contain a non-linear transform of a parameter or local variable. If it does, you need to include a target += statement with the log absolute determinant of the Jacobian of the transform. Left-hand-side of sampling statement: theta[i] ~ normal(…)</p>
-<p>recompiling to avoid crashing R session In file included from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config.hpp:39:0, from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/math/tools/config.hpp:13, from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core/var.hpp:7, from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core/gevv_vvv_vari.hpp:5, from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core.hpp:12, from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4, from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4, from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4, from file8664f972cf5.cpp:8: C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: “BOOST_NO_CXX11_RVALUE_REFERENCES” redefined # define BOOST_NO_CXX11_RVALUE_REFERENCES ^ <command-line>:0:0: note: this is the location of the previous definition is.na() applied to non-(list or vector) of type ‘NULL’data with name Y is not numeric and not usedError in new_CppObject_xp(fields<span class="math inline">\(.module, fields\)</span>.pointer, …) : Exception: variable does not exist; processing stage=data initialization; variable name=Y; base type=double (in ’model8664a74417a_basicBayesian’ at line 5)</p>
-<p><strong>failed to create the sampler; sampling not done</strong></p>
-</div>
+            iter = 10, chains = 4)</code></pre>
 
 
 
