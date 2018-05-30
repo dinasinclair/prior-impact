@@ -21,3 +21,24 @@ model {
     }
   }
 }
+
+/*
+Unclear if should include or if generating this in R is fine
+functions {
+    /**
+   * Return thetas drawn from a normal distribution determined by mu, tauSq
+   */
+
+   vector hierarchical_rng(real mu, real tauSq, int n) {
+      matrix[n, n] Y; // the data to be generated
+      vector [n] theta; // 
+      
+      // find theta
+      for (i in 1:n)
+        theta[n] <- normal(mu, tauSq);
+      return theta;
+
+      // Note that we don't have to generate the sigma, since those are assumed to be known.
+   }
+}
+*/
