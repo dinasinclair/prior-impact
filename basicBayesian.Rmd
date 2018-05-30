@@ -9,36 +9,56 @@ output: html_document
 library("rstan")
 ```
 
-First, declare the data. This seems to be where my current problem is coming
-from - I can't figure out the right way to declare a matrix so that rstan will
-accept it. [I'm getting the same error as is happening here](https://github.com/stan-dev/rstan/issues/384) but I haven't been able to fix it.
-
 The values I have inputted are currently completely arbitrary, with
 
- * $J$ is the number of individuals per study (**Question: Can $J$ be constant across all studies?**)
+ * $J$ is the number of individuals per study (**Note: this is currently set to be constant across all studies, which I need to change at some point because this is not realistic**)
  * $I$ is the number of studies
  * $Y_{i,j}$ is the data points from study $i$, individual $j$
- * $\sigma^2_{i,j}$ is the sampling variance of study $i$, individual $j$ (**Question: why does this vary by $j$ as well as by $i$?**)
+ * $\sigma^2_{i,j}$ is the sampling variance of study $i$, individual $j$ 
+ 
+We could choose values completely arbitrarily...
 ```{r}
-# basic_dat <- list(J = 3,
-#                     I =3,
-#                     Y = list(matrix(c(1,2,3,3,2,4,2,1,0.5),3,3)),
-#                     sigmaSq = list(matrix(c(1,.12,3,.3,2,.14,.2,.1,0.5),3,3))
-# )
 basic_dat <- list(J = 3,
                     I =3,
                     Y = list(c(1,4,2),c(4,2,5),c(.1,.4,.4)),
                     sigmaSq = list(c(.3,.2,.6),c(1,2,3),c(.3,.3,.1))
 )
-# basic_dat <- list(J = 1,
-#                     I =1,
-#                     Y = c(3),
-#                     sigmaSq = c(2)
-# )
 ```
 
-Here I run the model, but am curently getting an error (link above) about what I think is the way I'm inputting $Y$ and $\sigma^2$ matrices.
-```{r, eval = FALSE}
-fit <- stan(file = 'basicBayesian.stan', data = basic_dat, 
-            iter = 10, chains = 4)
+Instead, it would be better to backtrack from mu and tau
+Here we pick mu and tauSq to generate theta.
+
+**Question: How can we pick good pretend sigmaSq values?**
+```{r}
+set.seed(17)
+mu <- 10
+tauSq <- 2
+I <- 3
+J <- 3
+sigmaSq <- c(0.1,1,.2)
+
+theta <- rnorm(I, mu, tauSq)
+# This currently gives 1st row equal to theta(1), second row theta(2)... last row theta(I)
+# Currently can have sigma vary by i (study) but not j (individual)
+Y <- matrix( rnorm(I*J,mean=theta,sd=sigmaSq), I, J) 
+
+basic_dat_generated <- list(J,I,Y,sigmaSq = list(sigmaSq, sigmaSq, sigmaSq))
+
+theta
+Y
 ```
+
+
+Now we can run the model
+```{r}
+fit <- stan(file = 'basicBayesian.stan', data = basic_dat_generated, 
+            iter = 1000, chains = 4)
+```
+
+We get relatively reasonable backed out mu, tau, theta. Yay!
+```{r}
+fit
+```
+
+
+

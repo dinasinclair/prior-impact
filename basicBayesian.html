@@ -132,32 +132,175 @@ $(document).ready(function () {
 ## options(mc.cores = parallel::detectCores()).
 ## To avoid recompilation of unchanged Stan programs, we recommend calling
 ## rstan_options(auto_write = TRUE)</code></pre>
-<p>First, declare the data. This seems to be where my current problem is coming from - I can’t figure out the right way to declare a matrix so that rstan will accept it. <a href="https://github.com/stan-dev/rstan/issues/384">I’m getting the same error as is happening here</a> but I haven’t been able to fix it.</p>
 <p>The values I have inputted are currently completely arbitrary, with</p>
 <ul>
-<li><span class="math inline">\(J\)</span> is the number of individuals per study (<strong>Question: Can <span class="math inline">\(J\)</span> be constant across all studies?</strong>)</li>
+<li><span class="math inline">\(J\)</span> is the number of individuals per study (<strong>Note: this is currently set to be constant across all studies, which I need to change at some point because this is not realistic</strong>)</li>
 <li><span class="math inline">\(I\)</span> is the number of studies</li>
 <li><span class="math inline">\(Y_{i,j}\)</span> is the data points from study <span class="math inline">\(i\)</span>, individual <span class="math inline">\(j\)</span></li>
-<li><span class="math inline">\(\sigma^2_{i,j}\)</span> is the sampling variance of study <span class="math inline">\(i\)</span>, individual <span class="math inline">\(j\)</span> (<strong>Question: why does this vary by <span class="math inline">\(j\)</span> as well as by <span class="math inline">\(i\)</span>?</strong>)</li>
+<li><span class="math inline">\(\sigma^2_{i,j}\)</span> is the sampling variance of study <span class="math inline">\(i\)</span>, individual <span class="math inline">\(j\)</span></li>
 </ul>
-<pre class="r"><code># basic_dat &lt;- list(J = 3,
-#                     I =3,
-#                     Y = list(matrix(c(1,2,3,3,2,4,2,1,0.5),3,3)),
-#                     sigmaSq = list(matrix(c(1,.12,3,.3,2,.14,.2,.1,0.5),3,3))
-# )
-basic_dat &lt;- list(J = 3,
+<p>We could choose values completely arbitrarily…</p>
+<pre class="r"><code>basic_dat &lt;- list(J = 3,
                     I =3,
                     Y = list(c(1,4,2),c(4,2,5),c(.1,.4,.4)),
                     sigmaSq = list(c(.3,.2,.6),c(1,2,3),c(.3,.3,.1))
-)
-# basic_dat &lt;- list(J = 1,
-#                     I =1,
-#                     Y = c(3),
-#                     sigmaSq = c(2)
-# )</code></pre>
-<p>Here I run the model, but am curently getting an error (link above) about what I think is the way I’m inputting <span class="math inline">\(Y\)</span> and <span class="math inline">\(\sigma^2\)</span> matrices.</p>
-<pre class="r"><code>fit &lt;- stan(file = 'basicBayesian.stan', data = basic_dat, 
-            iter = 10, chains = 4)</code></pre>
+)</code></pre>
+<p>Instead, it would be better to backtrack from mu and tau Here we pick mu and tauSq to generate theta.</p>
+<p><strong>Question: How can we pick good pretend sigmaSq values?</strong></p>
+<pre class="r"><code>set.seed(17)
+mu &lt;- 10
+tauSq &lt;- 2
+I &lt;- 3
+J &lt;- 3
+sigmaSq &lt;- c(0.1,1,.2)
+
+theta &lt;- rnorm(I, mu, tauSq)
+# This currently gives 1st row equal to theta(1), second row theta(2)... last row theta(I)
+# Currently can have sigma vary by i (study) but not j (individual)
+Y &lt;- matrix( rnorm(I*J,mean=theta,sd=sigmaSq), I, J) 
+
+basic_dat_generated &lt;- list(J,I,Y,sigmaSq = list(sigmaSq, sigmaSq, sigmaSq))
+
+theta</code></pre>
+<pre><code>## [1] 7.969983 9.840727 9.534026</code></pre>
+<pre class="r"><code>Y</code></pre>
+<pre><code>##           [,1]      [,2]      [,3]
+## [1,]  7.888256  8.067270  8.006641
+## [2,] 10.612817 11.557261 11.021516
+## [3,]  9.500904  9.585073  9.662664</code></pre>
+<p>Now we can run the model</p>
+<pre class="r"><code>fit &lt;- stan(file = 'basicBayesian.stan', data = basic_dat_generated, 
+            iter = 1000, chains = 4)</code></pre>
+<pre><code>## In file included from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config.hpp:39:0,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/math/tools/config.hpp:13,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core/var.hpp:7,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core/gevv_vvv_vari.hpp:5,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core.hpp:12,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
+##                  from file1cff070554390.cpp:8:
+## C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: &quot;BOOST_NO_CXX11_RVALUE_REFERENCES&quot; redefined
+##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
+##  ^
+## &lt;command-line&gt;:0:0: note: this is the location of the previous definition
+## 
+## SAMPLING FOR MODEL 'basicBayesian' NOW (CHAIN 1).
+## 
+## Gradient evaluation took 0 seconds
+## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
+## Adjust your expectations accordingly!
+## 
+## 
+## Iteration:   1 / 1000 [  0%]  (Warmup)
+## Iteration: 100 / 1000 [ 10%]  (Warmup)
+## Iteration: 200 / 1000 [ 20%]  (Warmup)
+## Iteration: 300 / 1000 [ 30%]  (Warmup)
+## Iteration: 400 / 1000 [ 40%]  (Warmup)
+## Iteration: 500 / 1000 [ 50%]  (Warmup)
+## Iteration: 501 / 1000 [ 50%]  (Sampling)
+## Iteration: 600 / 1000 [ 60%]  (Sampling)
+## Iteration: 700 / 1000 [ 70%]  (Sampling)
+## Iteration: 800 / 1000 [ 80%]  (Sampling)
+## Iteration: 900 / 1000 [ 90%]  (Sampling)
+## Iteration: 1000 / 1000 [100%]  (Sampling)
+## 
+##  Elapsed Time: 0.025 seconds (Warm-up)
+##                0.021 seconds (Sampling)
+##                0.046 seconds (Total)
+## 
+## 
+## SAMPLING FOR MODEL 'basicBayesian' NOW (CHAIN 2).
+## 
+## Gradient evaluation took 0 seconds
+## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
+## Adjust your expectations accordingly!
+## 
+## 
+## Iteration:   1 / 1000 [  0%]  (Warmup)
+## Iteration: 100 / 1000 [ 10%]  (Warmup)
+## Iteration: 200 / 1000 [ 20%]  (Warmup)
+## Iteration: 300 / 1000 [ 30%]  (Warmup)
+## Iteration: 400 / 1000 [ 40%]  (Warmup)
+## Iteration: 500 / 1000 [ 50%]  (Warmup)
+## Iteration: 501 / 1000 [ 50%]  (Sampling)
+## Iteration: 600 / 1000 [ 60%]  (Sampling)
+## Iteration: 700 / 1000 [ 70%]  (Sampling)
+## Iteration: 800 / 1000 [ 80%]  (Sampling)
+## Iteration: 900 / 1000 [ 90%]  (Sampling)
+## Iteration: 1000 / 1000 [100%]  (Sampling)
+## 
+##  Elapsed Time: 0.085 seconds (Warm-up)
+##                0.029 seconds (Sampling)
+##                0.114 seconds (Total)
+## 
+## 
+## SAMPLING FOR MODEL 'basicBayesian' NOW (CHAIN 3).
+## 
+## Gradient evaluation took 0 seconds
+## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
+## Adjust your expectations accordingly!
+## 
+## 
+## Iteration:   1 / 1000 [  0%]  (Warmup)
+## Iteration: 100 / 1000 [ 10%]  (Warmup)
+## Iteration: 200 / 1000 [ 20%]  (Warmup)
+## Iteration: 300 / 1000 [ 30%]  (Warmup)
+## Iteration: 400 / 1000 [ 40%]  (Warmup)
+## Iteration: 500 / 1000 [ 50%]  (Warmup)
+## Iteration: 501 / 1000 [ 50%]  (Sampling)
+## Iteration: 600 / 1000 [ 60%]  (Sampling)
+## Iteration: 700 / 1000 [ 70%]  (Sampling)
+## Iteration: 800 / 1000 [ 80%]  (Sampling)
+## Iteration: 900 / 1000 [ 90%]  (Sampling)
+## Iteration: 1000 / 1000 [100%]  (Sampling)
+## 
+##  Elapsed Time: 0.045 seconds (Warm-up)
+##                0.024 seconds (Sampling)
+##                0.069 seconds (Total)
+## 
+## 
+## SAMPLING FOR MODEL 'basicBayesian' NOW (CHAIN 4).
+## 
+## Gradient evaluation took 0 seconds
+## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
+## Adjust your expectations accordingly!
+## 
+## 
+## Iteration:   1 / 1000 [  0%]  (Warmup)
+## Iteration: 100 / 1000 [ 10%]  (Warmup)
+## Iteration: 200 / 1000 [ 20%]  (Warmup)
+## Iteration: 300 / 1000 [ 30%]  (Warmup)
+## Iteration: 400 / 1000 [ 40%]  (Warmup)
+## Iteration: 500 / 1000 [ 50%]  (Warmup)
+## Iteration: 501 / 1000 [ 50%]  (Sampling)
+## Iteration: 600 / 1000 [ 60%]  (Sampling)
+## Iteration: 700 / 1000 [ 70%]  (Sampling)
+## Iteration: 800 / 1000 [ 80%]  (Sampling)
+## Iteration: 900 / 1000 [ 90%]  (Sampling)
+## Iteration: 1000 / 1000 [100%]  (Sampling)
+## 
+##  Elapsed Time: 0.054 seconds (Warm-up)
+##                0.035 seconds (Sampling)
+##                0.089 seconds (Total)</code></pre>
+<p>We get relatively reasonable backed out mu, tau, theta. Yay!</p>
+<pre class="r"><code>fit</code></pre>
+<pre><code>## Inference for Stan model: basicBayesian.
+## 4 chains, each with iter=1000; warmup=500; thin=1; 
+## post-warmup draws per chain=500, total post-warmup draws=2000.
+## 
+##           mean se_mean   sd   2.5%   25%   50%   75% 97.5% n_eff Rhat
+## mu        9.36    0.17 2.65   4.38  8.65  9.38 10.19 14.31   253    1
+## tau       1.61    0.04 0.70   0.89  1.16  1.42  1.82  3.55   387    1
+## theta[1]  7.92    0.00 0.09   7.74  7.86  7.93  7.98  8.11  1548    1
+## theta[2] 10.70    0.00 0.09  10.51 10.64 10.70 10.76 10.88  1729    1
+## theta[3]  9.53    0.00 0.09   9.35  9.47  9.53  9.60  9.72  1570    1
+## lp__     -7.36    0.09 1.95 -12.11 -8.45 -6.93 -5.92 -4.75   526    1
+## 
+## Samples were drawn using NUTS(diag_e) at Wed May 30 23:00:32 2018.
+## For each parameter, n_eff is a crude measure of effective sample size,
+## and Rhat is the potential scale reduction factor on split chains (at 
+## convergence, Rhat=1).</code></pre>
 
 
 

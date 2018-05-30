@@ -1,4 +1,5 @@
 // saved as basicBayesian.stan
+
 data {
   int<lower=0> J; // number of individuals per study
   int<lower=0> I; // number of studies
