@@ -209,8 +209,11 @@ save(outOfSampleModels, outOfSampleTreatmentEffects, file = file.path(outputFold
 tslsmodel <- tsls(change_en ~ treat, ~ T_hat, data=test)
 summary(tslsmodel)
 
+
+## DS: Linear regression step 1 to estimate Y_i which is your beta that has some standard error sigma
 models <- dlply(test, "group_par", function(df) 
   lm(change_hr ~ T_hat, data = df))
+
 
 # Apply coef to each model and return a data frame
 fit<-ldply(models, coef)
@@ -242,6 +245,17 @@ group <- unique(ds$group_id)
 groupsize <- sapply(group, function(x) sum(ds$group_id==x))  
 group <- group[groupsize>1] 
 #estimate true theta and tau for each group using all data
+
+# Think of Y as an effect size with a standard error
+# DS: Using Y_1(t-1)  Y_2(t-1) etc you approximate a theta for Y sim N(theta, sigma)
+# Now we get imagine this is a second draw for Y_i(t-1), call it Y_i(t) 
+# (this can be a pretend new study). 
+# So now we need to combine this with
+# Y_i because we'll assume this is fixed effects and that both are from the same N dist. 
+# So combine these two pieces of info  
+# to get Y'_i weighted by the standard errors (updating both the mean and the 
+# standard error)
+# DS: Look up the common filter. Scroll down to normal distribution part of Eva's email link
 TrueResult <- vector('list', length = length(group))
 method="FB"
 for(ii in 1:length(group)){
@@ -343,6 +357,8 @@ for (kk in 1:nGroupPermutations)
     #one possible draw (in policymaker's mind) of what a study could find.
     #will need to make this into a vector later.
     #assuming the new study has a sigma 5x smaller than original:
+    
+    #DS: the 5x smaller is kind of arbitrary
     newStudySigma <- priors_list$sigma/10
     df<-normv(1, priors_list$theta_i, newStudySigma)
     
@@ -356,6 +372,22 @@ for (kk in 1:nGroupPermutations)
     # combine new (hypothetical) result w previous study result for each i using fixed-effects
     #################################################################################
     # this avoids double-counting, which would happen if you first combined new data with priors.
+    
+    # DS: Substitute in new Y'_i. Want to combine using a random effects model to get a bunch of 
+    # theta hats. We care about the thetas more than mu, tau because they are the effects per city
+    # the thetas are shrinkage estimators... if you have a bunch of studies and a few have huge 
+    # standard errors, then the weird outliers with large standard errors probably would have found less weird effect sizes
+    # thetas tend to be closer together, they're like corrections for the Y'_i that take into account both the individual study and the 
+    # group of studies as a whole.
+    
+    # DS: Okay so let's say we had a study in city 1 only so we have Y'_1 and old Y_2... use all of this to generate theta
+    # Note that we're NOT updating the old theta using a new prior. First combining data using fixed effects to get Y'_1, then combining using a NEW random effects model
+    # as if we had no prior theta at all. This is different bc we assume that within city is a fixed effects model
+    
+    # DS: fixed effects model is same as pooling all data from first and second city study to make Y`_i estimate
+    
+    # DS: Try this out for all possible cities to pick to get new info for, see which gives the best thetas. Calculate the new information value! For every city combo
+    # you have to try things out several `times, get several draws and see which ones are useful (change your mind) then take an average to approximate the usefulness.
     
     ds <- studies[, c("treatmentcoefficient","treatmentstandarderror")]
     

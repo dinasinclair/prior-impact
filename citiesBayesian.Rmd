@@ -1,0 +1,39 @@
+---
+title: "Bayesian Cities Model"
+author: "Dina Sinclair"
+date: "June 9, 2018"
+output: html_document
+---
+
+###Inputs
+
+Given
+
+$$Y = (Y_1, \dots, Y_i) $$
+where each $Y_i$ has its own given $\sigma_{i,j}$,assume $Y \sim N(\theta_i, \sigma_{i,j})$.
+
+### Step 1: Calculate $\theta_i, \mu, \tau^2$ using the original priors Y
+
+$$\theta_i \sim N(\mu, \tau^2)$$
+
+### Step 2: Pick $k$, calculate $Y'_k$
+
+Then pick $k$ such that you get another draw, $Y'_k$ from that same fixed effects model. AKA
+
+$$Y'_k \sim N(\theta_k, \sigma_{k,j})$$
+
+### Step 3: Update all $Y$ values to get $Y^U$
+
+Once those $k$ new values get calculated, update by combining to get 
+$$update(Y_k, Y'_k) = Y^U_k$$
+
+### Step 4: Use $Y^U$ to get final $\theta^U$
+
+and once we have all the updated $Y_i^U$ we can use them to get $\theta_i^U$ based off of $\mu^U, \tau^{U2}$ with $Y^U \sim N(\theta^U_i, \sigma^U_{i,j})$ 
+
+
+
+
+
+
+
