@@ -5,6 +5,10 @@ date: "June 9, 2018"
 output: html_document
 ---
 
+```{r, warning = FALSE}
+library("rstan")
+```
+
 ###Inputs
 
 Given
@@ -12,9 +16,37 @@ Given
 $$Y = (Y_1, \dots, Y_i) $$
 where each $Y_i$ has its own given $\sigma_{i,j}$,assume $Y \sim N(\theta_i, \sigma_{i,j})$.
 
+For now, we'll use that classic arbitrary dataset I've been using
+We'll hope that we can recover mu and tauSq correctly!
+```{r, results='hide'}
+set.seed(17)
+mu <- 10
+tauSq <- 2
+I <- 3
+J <- 3
+sigmaSq <- c(0.1,1,.2)
+theta <- rnorm(I, mu, tauSq)
+
+# Here 1st row equal to theta(1), second row theta(2)... last row theta(I)
+# Sigma varies by i (study) but not j (individual)
+Y <- matrix( rnorm(I*J,mean=theta,sd=sigmaSq), I, J) 
+basic_dat_generated <- list(J,I,Y,sigmaSq = list(sigmaSq, sigmaSq, sigmaSq))
+
+theta
+Y
+```
+
 ### Step 1: Calculate $\theta_i, \mu, \tau^2$ using the original priors Y
 
 $$\theta_i \sim N(\mu, \tau^2)$$
+
+```{r}
+fit <- stan(file = 'randomEffectsModelConstrainedI.stan', 
+            data = basic_dat_generated, 
+            iter = 1000, chains = 4)
+fit
+```
+
 
 ### Step 2: Pick $k$, calculate $Y'_k$
 

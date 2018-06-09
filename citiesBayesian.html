@@ -123,10 +123,34 @@ $(document).ready(function () {
 </div>
 
 
+<pre class="r"><code>library(&quot;rstan&quot;)</code></pre>
+<pre><code>## Loading required package: ggplot2</code></pre>
+<pre><code>## Loading required package: StanHeaders</code></pre>
+<pre><code>## rstan (Version 2.17.3, GitRev: 2e1f913d3ca3)</code></pre>
+<pre><code>## For execution on a local, multicore CPU with excess RAM we recommend calling
+## options(mc.cores = parallel::detectCores()).
+## To avoid recompilation of unchanged Stan programs, we recommend calling
+## rstan_options(auto_write = TRUE)</code></pre>
 <div id="inputs" class="section level3">
 <h3>Inputs</h3>
 <p>Given</p>
 <p><span class="math display">\[Y = (Y_1, \dots, Y_i) \]</span> where each <span class="math inline">\(Y_i\)</span> has its own given <span class="math inline">\(\sigma_{i,j}\)</span>,assume <span class="math inline">\(Y \sim N(\theta_i, \sigma_{i,j})\)</span>.</p>
+<p>For now, we’ll use that classic arbitrary dataset I’ve been using We’ll hope that we can recover mu and tauSq correctly!</p>
+<pre class="r"><code>set.seed(17)
+mu &lt;- 10
+tauSq &lt;- 2
+I &lt;- 3
+J &lt;- 3
+sigmaSq &lt;- c(0.1,1,.2)
+theta &lt;- rnorm(I, mu, tauSq)
+
+# Here 1st row equal to theta(1), second row theta(2)... last row theta(I)
+# Sigma varies by i (study) but not j (individual)
+Y &lt;- matrix( rnorm(I*J,mean=theta,sd=sigmaSq), I, J) 
+basic_dat_generated &lt;- list(J,I,Y,sigmaSq = list(sigmaSq, sigmaSq, sigmaSq))
+
+theta
+Y</code></pre>
 </div>
 <div id="step-1-calculate-theta_i-mu-tau2-using-the-original-priors-y" class="section level3">
 <h3>Step 1: Calculate <span class="math inline">\(\theta_i, \mu, \tau^2\)</span> using the original priors Y</h3>

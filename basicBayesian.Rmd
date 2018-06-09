@@ -52,7 +52,7 @@ Y
 Now we can run the model
 ```{r}
 fit <- stan(file = 'basicBayesian.stan', data = basic_dat_generated, 
-            iter = 1000, chains = 4)
+            iter = 10, chains = 4)
 ```
 
 We get relatively reasonable backed out mu, tau, theta. Yay!
