@@ -43,16 +43,23 @@ $$\theta_i \sim N(\mu, \tau^2)$$
 ```{r}
 fit <- stan(file = 'randomEffectsModelConstrainedI.stan', 
             data = basic_dat_generated, 
-            iter = 1000, chains = 4)
+            iter = 1000, chains = 2)
 fit
 ```
 
 
 ### Step 2: Pick $k$, calculate $Y'_k$
 
-Then pick $k$ such that you get another draw, $Y'_k$ from that same fixed effects model. AKA
+Then pick $k$ such that you get another draw, $Y'_k$ from that same fixed effects model (except with a smaller standard deviation... this second choice is kind of arbitrary - here we're going with 5x smaller)
 
-$$Y'_k \sim N(\theta_k, \sigma_{k,j})$$
+$$Y'_k \sim N(\theta_k, \frac 1 5 \sigma_{k,j})$$
+Here we're first going to go with the boring simple version where the subset K is just k=2. So we keep $Y_1$, $Y_3$ unchanged but need to make a $Y'_2$ using the generated $\theta_2$. We use an arbitrary 5x smaller sigma in $Y'_2$ than in $Y_2$ as noted in the norm above
+```{r}
+params <- extract(fit)
+mean(params$theta)
+mean(params$theta[,2])
+new_draw <- rnorm( 1 , mean = mean(params$theta[2]) , sd = (1/5)*sigmaSq[2] )
+```
 
 ### Step 3: Update all $Y$ values to get $Y^U$
 
