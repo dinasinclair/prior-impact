@@ -124,50 +124,249 @@ $(document).ready(function () {
 
 
 <pre class="r"><code>library(&quot;rstan&quot;)</code></pre>
-<pre><code>## Loading required package: ggplot2</code></pre>
-<pre><code>## Loading required package: StanHeaders</code></pre>
-<pre><code>## rstan (Version 2.17.3, GitRev: 2e1f913d3ca3)</code></pre>
-<pre><code>## For execution on a local, multicore CPU with excess RAM we recommend calling
-## options(mc.cores = parallel::detectCores()).
-## To avoid recompilation of unchanged Stan programs, we recommend calling
-## rstan_options(auto_write = TRUE)</code></pre>
 <div id="inputs" class="section level3">
 <h3>Inputs</h3>
+<div id="notation" class="section level5">
+<h5>Notation</h5>
 <p>Given</p>
-<p><span class="math display">\[Y = (Y_1, \dots, Y_i) \]</span> where each <span class="math inline">\(Y_i\)</span> has its own given <span class="math inline">\(\sigma_{i,j}\)</span>,assume <span class="math inline">\(Y \sim N(\theta_i, \sigma_{i,j})\)</span>.</p>
+<p><span class="math display">\[Y = (Y_1, \dots, Y_i) \]</span> where each <span class="math inline">\(Y_i\)</span> has its own given <span class="math inline">\(\sigma_{i,j}\)</span>,assume <span class="math inline">\(Y \sim N(\theta_i, \sigma_{i,j}^2)\)</span>.</p>
+<p>In matrix form we’ll be using <span class="math display">\[Y = \begin{bmatrix} Y_{study 1} \\ \vdots \\ Y_{study N}\end{bmatrix}
+    = \begin{bmatrix} 
+      Y_{11} &amp; \dots &amp; Y _{1J} \\
+      &amp; \ddots &amp; \\
+      Y_{N1} &amp; \dots &amp; Y_{NJ}
+      \end{bmatrix}\]</span> Here, we’ll use <span class="math inline">\(Y_1\)</span> to refer to the vector <span class="math inline">\((Y_{11},\dots,Y_{1J})\)</span> and assume for now that all studies have the same sample size <span class="math inline">\(J\)</span> (Not very accurate, we’ll have to change that later!).</p>
+</div>
+<div id="arbitrary-example-inputs" class="section level5">
+<h5>Arbitrary Example Inputs</h5>
 <p>For now, we’ll use that classic arbitrary dataset I’ve been using We’ll hope that we can recover mu and tauSq correctly!</p>
-<pre class="r"><code>set.seed(17)
+<pre class="r"><code># Set input parameters
+set.seed(17)
 mu &lt;- 10
 tauSq &lt;- 2
 I &lt;- 3
 J &lt;- 3
-sigmaSq &lt;- c(0.1,1,.2)
+sigmaSq &lt;- c(0.1,0.4,.2,0.1,0.2,0.2,0.5,0.6,0.3)
+
+# Calculate theta, reshape sigmaSq
 theta &lt;- rnorm(I, mu, tauSq)
+sigmaSq &lt;- matrix(sigmaSq, I , J)
 
-# Here 1st row equal to theta(1), second row theta(2)... last row theta(I)
-# Sigma varies by i (study) but not j (individual)
-Y &lt;- matrix( rnorm(I*J,mean=theta,sd=sigmaSq), I, J) 
-basic_dat_generated &lt;- list(J,I,Y,sigmaSq = list(sigmaSq, sigmaSq, sigmaSq))
+# Calculate and reshape Y
+Y_vect &lt;- numeric()
+for(i in 1:I){
+  Y_vect &lt;- c(Y_vect, rnorm(J,mean=theta[i],sd=sigmaSq[i,]))
+}
+Y &lt;- matrix(Y_vect , I, J, byrow = TRUE)
 
-theta
-Y</code></pre>
+# Save our input data together in a list
+basic_dat_generated &lt;- list(J,I,Y,sigmaSq)
+
+# Display the generated input data for reference
+print(&quot;Theta:&quot;)</code></pre>
+<pre><code>## [1] &quot;Theta:&quot;</code></pre>
+<pre class="r"><code>theta</code></pre>
+<pre><code>## [1] 7.969983 9.840727 9.534026</code></pre>
+<pre class="r"><code>print(&quot;SigmaSq:&quot;)</code></pre>
+<pre><code>## [1] &quot;SigmaSq:&quot;</code></pre>
+<pre class="r"><code>sigmaSq</code></pre>
+<pre><code>##      [,1] [,2] [,3]
+## [1,]  0.1  0.1  0.5
+## [2,]  0.4  0.2  0.6
+## [3,]  0.2  0.2  0.3</code></pre>
+<pre class="r"><code>print(&quot;Y:&quot;)</code></pre>
+<pre><code>## [1] &quot;Y:&quot;</code></pre>
+<pre class="r"><code>Y</code></pre>
+<pre><code>##           [,1]      [,2]     [,3]
+## [1,]  7.888256  8.047192 7.887177
+## [2,] 10.229876 10.184033 9.993869
+## [3,]  9.607342  9.770184 9.726984</code></pre>
+</div>
 </div>
 <div id="step-1-calculate-theta_i-mu-tau2-using-the-original-priors-y" class="section level3">
 <h3>Step 1: Calculate <span class="math inline">\(\theta_i, \mu, \tau^2\)</span> using the original priors Y</h3>
-<p><span class="math display">\[\theta_i \sim N(\mu, \tau^2)\]</span></p>
+<p>We’re assuming a <strong>random effects model</strong>, that is that <span class="math display">\[\theta_i \sim N(\mu, \tau^2) \text{ and } Y_i \sim N(\theta_i, \sigma_{ij}^2)\]</span></p>
+<p>To make use of this assumption, we need to estimate scalars <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span> along with the vector <span class="math inline">\(\theta = (\theta_1,\dots,\theta_N)\)</span>. We can do this using stan!</p>
+<pre class="r"><code>fit &lt;- stan(file = 'randomEffectsModelConstrainedI.stan', 
+            data = basic_dat_generated, 
+            iter = 1000, chains = 2)</code></pre>
+<pre><code>## In file included from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config.hpp:39:0,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/math/tools/config.hpp:13,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core/var.hpp:7,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core/gevv_vvv_vari.hpp:5,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/core.hpp:12,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
+##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
+##                  from file6b986b175305.cpp:8:
+## C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: &quot;BOOST_NO_CXX11_RVALUE_REFERENCES&quot; redefined
+##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
+##  ^
+## &lt;command-line&gt;:0:0: note: this is the location of the previous definition
+## 
+## SAMPLING FOR MODEL 'randomEffectsModelConstrainedI' NOW (CHAIN 1).
+## 
+## Gradient evaluation took 0 seconds
+## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
+## Adjust your expectations accordingly!
+## 
+## 
+## Iteration:   1 / 1000 [  0%]  (Warmup)
+## Iteration: 100 / 1000 [ 10%]  (Warmup)
+## Iteration: 200 / 1000 [ 20%]  (Warmup)
+## Iteration: 300 / 1000 [ 30%]  (Warmup)
+## Iteration: 400 / 1000 [ 40%]  (Warmup)
+## Iteration: 500 / 1000 [ 50%]  (Warmup)
+## Iteration: 501 / 1000 [ 50%]  (Sampling)
+## Iteration: 600 / 1000 [ 60%]  (Sampling)
+## Iteration: 700 / 1000 [ 70%]  (Sampling)
+## Iteration: 800 / 1000 [ 80%]  (Sampling)
+## Iteration: 900 / 1000 [ 90%]  (Sampling)
+## Iteration: 1000 / 1000 [100%]  (Sampling)
+## 
+##  Elapsed Time: 0.051 seconds (Warm-up)
+##                0.035 seconds (Sampling)
+##                0.086 seconds (Total)
+## 
+## 
+## SAMPLING FOR MODEL 'randomEffectsModelConstrainedI' NOW (CHAIN 2).
+## 
+## Gradient evaluation took 0 seconds
+## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
+## Adjust your expectations accordingly!
+## 
+## 
+## Iteration:   1 / 1000 [  0%]  (Warmup)
+## Iteration: 100 / 1000 [ 10%]  (Warmup)
+## Iteration: 200 / 1000 [ 20%]  (Warmup)
+## Iteration: 300 / 1000 [ 30%]  (Warmup)
+## Iteration: 400 / 1000 [ 40%]  (Warmup)
+## Iteration: 500 / 1000 [ 50%]  (Warmup)
+## Iteration: 501 / 1000 [ 50%]  (Sampling)
+## Iteration: 600 / 1000 [ 60%]  (Sampling)
+## Iteration: 700 / 1000 [ 70%]  (Sampling)
+## Iteration: 800 / 1000 [ 80%]  (Sampling)
+## Iteration: 900 / 1000 [ 90%]  (Sampling)
+## Iteration: 1000 / 1000 [100%]  (Sampling)
+## 
+##  Elapsed Time: 0.042 seconds (Warm-up)
+##                0.026 seconds (Sampling)
+##                0.068 seconds (Total)</code></pre>
+<pre class="r"><code>fit</code></pre>
+<pre><code>## Inference for Stan model: randomEffectsModelConstrainedI.
+## 2 chains, each with iter=1000; warmup=500; thin=1; 
+## post-warmup draws per chain=500, total post-warmup draws=1000.
+## 
+##           mean se_mean   sd  2.5%   25%   50%   75% 97.5% n_eff Rhat
+## mu        9.31    0.20 2.57  3.85  8.60  9.30 10.05 14.17   161 1.01
+## tau       1.64    0.06 0.84  0.81  1.10  1.40  1.86  4.25   171 1.01
+## theta[1]  7.97    0.00 0.07  7.83  7.92  7.97  8.02  8.10  1000 1.01
+## theta[2] 10.16    0.01 0.17  9.79 10.04 10.17 10.27 10.48   550 1.00
+## theta[3]  9.69    0.00 0.13  9.44  9.60  9.69  9.78  9.95   935 1.00
+## lp__     -3.79    0.16 2.04 -8.54 -4.95 -3.36 -2.25 -1.04   170 1.00
+## 
+## Samples were drawn using NUTS(diag_e) at Thu Jun 14 15:32:21 2018.
+## For each parameter, n_eff is a crude measure of effective sample size,
+## and Rhat is the potential scale reduction factor on split chains (at 
+## convergence, Rhat=1).</code></pre>
 </div>
-<div id="step-2-pick-k-calculate-y_k" class="section level3">
-<h3>Step 2: Pick <span class="math inline">\(k\)</span>, calculate <span class="math inline">\(Y'_k\)</span></h3>
-<p>Then pick <span class="math inline">\(k\)</span> such that you get another draw, <span class="math inline">\(Y'_k\)</span> from that same fixed effects model. AKA</p>
-<p><span class="math display">\[Y'_k \sim N(\theta_k, \sigma_{k,j})\]</span></p>
+<div id="step-2-pick-k-studies-to-pilot-calculate-y_k" class="section level3">
+<h3>Step 2: Pick <span class="math inline">\(K\)</span> studies to pilot, calculate <span class="math inline">\(Y'_k\)</span></h3>
+<div id="theoretically" class="section level5">
+<h5>Theoretically</h5>
+<p>First, pick <span class="math inline">\(K\)</span> studies <span class="math inline">\(k\)</span> to update through new information. For these studies, we’ll assume a <strong>fixed effects model</strong> and draw <span class="math inline">\(J\)</span> new samples, imagining that this is a new study done in the same place (with fixed <span class="math inline">\(\mu_k = \theta_k\)</span> from step 1) that gets us a new dataset. So we can define</p>
+<p><span class="math display">\[Y'_k = (Y'_{k1},\dots,Y'_{kJ})\]</span> from that fixed effects model. We need to know <span class="math inline">\(\sigma_{kj}\)</span> for these new studies. For now we will arbitrarily decide that <span class="math inline">\(\sigma_{kj} = \frac 1 5 \sigma_{ij}\)</span> (AKA that these new studies done will have a fifth of the error we were encountering in the first study). So for <span class="math inline">\(i \in K\)</span>,</p>
+<p><span class="math display">\[ Y'_i \sim N(\theta_i, \frac 1 5 \sigma_{i,j})\]</span></p>
+</div>
+<div id="concretely" class="section level5">
+<h5>Concretely</h5>
+<p>Here we’re first going to go with the boring simple version where the subset K is just k=2. So we keep <span class="math inline">\(Y_1\)</span>, <span class="math inline">\(Y_3\)</span> unchanged but need to make a <span class="math inline">\(Y'_2\)</span> using the generated <span class="math inline">\(\theta_2\)</span>. We use an arbitrary 5x smaller sigma in <span class="math inline">\(Y'_2\)</span> than in <span class="math inline">\(Y_2\)</span> as noted in the norm above</p>
+<pre class="r"><code># Define set K of cities to try the pilot on and collect more data
+K &lt;- c(2)
+
+# Calculate new data for all K new pilots
+params &lt;- extract(fit)
+for (k in K){
+  print(&quot;Theta chosen for new pilot:&quot;)
+  print(mean(params$theta[,k]))
+  new_draw &lt;- rnorm( J , mean = mean(params$theta[,k]) , sd = (1/5)*sigmaSq[k,] )
+  print(&quot;New Draw Results:&quot;)
+  print(new_draw)
+}</code></pre>
+<pre><code>## [1] &quot;Theta chosen for new pilot:&quot;
+## [1] 10.15727
+## [1] &quot;New Draw Results:&quot;
+## [1]  9.986877 10.153549 10.126134</code></pre>
+<p>This leaves me with some <strong>lingering questions</strong>: * Should we be calculating J new draws and getting a complete new dataset, or calculating one more draw only to get a new mu? * If we calculate only one more draw, what do we use as that draw’s sigmaSq value? 1/5 of the average of the previous sigmaSq values?</p>
+</div>
 </div>
 <div id="step-3-update-all-y-values-to-get-yu" class="section level3">
 <h3>Step 3: Update all <span class="math inline">\(Y\)</span> values to get <span class="math inline">\(Y^U\)</span></h3>
 <p>Once those <span class="math inline">\(k\)</span> new values get calculated, update by combining to get <span class="math display">\[update(Y_k, Y'_k) = Y^U_k\]</span></p>
+<p>This draws on the idea that the mean can be combined with the equation (where <span class="math inline">\(A\)</span> is a matrix form of <span class="math inline">\(Y\)</span> and <span class="math inline">\(B\)</span> is a matrix form of <span class="math inline">\(\sigma^2\)</span>) <span class="math display">\[ mean = \frac{A \tau^2 + B \mu}{B + \tau^2}\]</span> and variance can be combined using <span class="math display">\[var = \frac{B\tau^2}{B+\tau^2} = \frac{1}{\frac{1}{\tau^2}+\frac{1}{B}}\]</span> While I have values for <span class="math inline">\(A\)</span>,<span class="math inline">\(B\)</span>,<span class="math inline">\(\tau^2\)</span> and <span class="math inline">\(\mu\)</span>, I’m confused.</p>
+<p><strong>Specifically, my quesitons are:</strong> * These equations don’t seem to check out dimensionally. A and B are matrices, but I was under the impression that <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span> are scalars. Are <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span> vectors? * It looks to me like this equation would give me a scalar mean and variance. Does that mean that A and B are scalars from one dist, and <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau\)</span> are scalars from the other dist? That would make sense. But then I’m getting a result that’s also just a pair of scalars rather than a dataset. Don’t I need a dataset to run that final bayesian model in the next step? Would I need to generate that data? * How do I decide on a scalar sigmaSq for <span class="math inline">\(Y\)</span> if sigmaSq varies across individuals?</p>
+<p>What I’ve done below as a result of these questions is coded up a simple scalar -&gt; scalar version and will ask you about clarifications later.</p>
+<div id="concretely-1" class="section level5">
+<h5>Concretely</h5>
+<p>Now that we have the generated new information <span class="math inline">\(Y'_k\)</span>, we need to combine it with the old information <span class="math inline">\(Y_k\)</span>. We can do this by combining the means weighted by their standard deviations. I thought Eva described how to do this in the How Much Can We Generalize paper section 2.2 equation (8) as well as in this suff_theta code she wrote in her multiDrawRandomGrouping.R code, but the more I look at both that equation and this code the more questions I have.</p>
+<pre class="r"><code># Eva's Code
+suff_theta &lt;- function(Y, mu, tau2, sigma2){
+  #vectorize for the whole sample size instead of one sample each run 
+  n &lt;- length(Y)
+  m &lt;- length(tau2)
+  A &lt;- matrix(Y, ncol = n, nrow = m, byrow = TRUE)
+  B &lt;- matrix(sigma2, ncol = n, nrow = m, byrow = TRUE)
+  mean &lt;- (A*tau2 + B*mu) /  (B + tau2)
+  var &lt;- B*tau2 /( B+ tau2)
+  #return the mean and variance for all e_i samples
+  #in matrix with nrow = # of e_i and ncol = #samples
+  return(list(mean = mean, var = var))
+}
+
+# My One-Dimensional Code
+update_Y &lt;- function(mu1, mu2, sigSq1, sigSq2){
+  update_mu &lt;- (mu1*sigSq2 + mu2*sigSq1)/(sigSq1 + sigSq2)
+  update_sigSq &lt;- (sigSq1*sigSq2)/(sigSq1 + sigSq2)
+  return(list(mu = update_mu, sigmaSq = update_sigSq))
+}
+
+# Using my 1D code and the average(??) sigma from Y as sigSq1
+# Calculate new data for all K new pilots
+for (k in K){
+  print(&quot;Theta chosen from new pilot:&quot;)
+  print(mean(params$theta[,k]))
+  new_draw &lt;- rnorm( 1 , mean = mean(params$theta[,k]) , sd = (1/5)*sigmaSq[k,] )
+  print(&quot;New Draw Result:&quot;)
+  print(new_draw)
+  print(&quot;Average sigmaSq from original Y&quot;)
+  avgSigSq &lt;- mean(sigmaSq[k,])
+  print(avgSigSq)
+  Y_U &lt;- update_Y(mean(params$theta[,k]),new_draw,avgSigSq,avgSigSq/5)
+}</code></pre>
+<pre><code>## [1] &quot;Theta chosen from new pilot:&quot;
+## [1] 10.15727
+## [1] &quot;New Draw Result:&quot;
+## [1] 10.21232
+## [1] &quot;Average sigmaSq from original Y&quot;
+## [1] 0.4</code></pre>
+<pre class="r"><code>print(&quot;updated Y&quot;)</code></pre>
+<pre><code>## [1] &quot;updated Y&quot;</code></pre>
+<pre class="r"><code>Y_U</code></pre>
+<pre><code>## $mu
+## [1] 10.20315
+## 
+## $sigmaSq
+## [1] 0.06666667</code></pre>
+</div>
 </div>
 <div id="step-4-use-yu-to-get-final-thetau" class="section level3">
 <h3>Step 4: Use <span class="math inline">\(Y^U\)</span> to get final <span class="math inline">\(\theta^U\)</span></h3>
 <p>and once we have all the updated <span class="math inline">\(Y_i^U\)</span> we can use them to get <span class="math inline">\(\theta_i^U\)</span> based off of <span class="math inline">\(\mu^U, \tau^{U2}\)</span> with <span class="math inline">\(Y^U \sim N(\theta^U_i, \sigma^U_{i,j})\)</span></p>
+<pre class="r"><code>updated_dat_generated &lt;- list(J, I, Y_U, sigmaSq_U)
+fit_updated &lt;- stan(file = 'randomEffectsModelConstrainedI.stan', 
+            data = updated_dat_generated, 
+            iter = 1000, chains = 2)
+fit_updated</code></pre>
 </div>
 
 
