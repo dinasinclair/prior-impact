@@ -27,6 +27,7 @@ We'll hope that we can recover mu and tauSq correctly!
 set.seed(17)
 mu <- 10
 tauSq <- 2
+C <- 2
 I <- 3
 J <- 1
 sigmaSq <- runif(I)
@@ -34,24 +35,22 @@ sigmaSq <- runif(I)
 # Calculate theta, reshape sigmaSq
 theta <- rnorm(I, mu, tauSq)
 sigmaSq <- matrix(sigmaSq, I , J)
+theta <- matrix(theta, I , J)
 
 # Calculate and reshape Y
-Y_vect <- numeric()
-for(i in 1:I){
-  Y_vect <- c(Y_vect, rnorm(J,mean=theta[i],sd=sigmaSq[i,]))
-}
-Y <- matrix(Y_vect , I, J, byrow = TRUE)
+Y <- list(mu=theta, sd=sigmaSq)
 
 # Save our input data together in a list
-basic_dat_generated <- list(J,I,Y,sigmaSq)
+basic_dat_generated <- list(J,I,Y=theta,sigmaSq=sigmaSq)
 
 # Display the generated input data for reference
-print("Theta:")
-theta
-print("SigmaSq:")
-sigmaSq
-print("Y:")
-Y
+# print("Theta:")
+# theta
+# print("SigmaSq:")
+# sigmaSq
+# print("Y:")
+# Y
+basic_dat_generated
 ```
 
 ### Step 1: Calculate $\theta_i, \mu, \tau^2$ using the original priors Y
@@ -69,9 +68,11 @@ fit
 ```{r}
 # Readjust knowledge of Y based off of REM
 params <- extract(fit)
-for (i in 1:nrow(Y)){
-  Y[i] <- mean(params$theta[,i])
+for (i in 1:length(Y$mu)){
+  Y$mu[i] <- mean(params$theta[,i])
 }
+# TODO: Do we need to update the sd at all here post basic fit?
+Y
 ```
 
 
@@ -90,13 +91,17 @@ Here we're first going to go with the boring simple version where the subset K i
 # Define set K of cities to try the pilot on and collect more data
 K <- c(2)
 
-for (k in K){
-  print("Theta for new pilot:")
-  print(Y[k])
-  new_draw <- rnorm( J , mean = Y[k] , sd = (1/5)*sigmaSq[k] )
-  print("New Draw Results:")
-  print(new_draw)
-}
+
+# for (k in K){
+#   print("Theta for new pilot:")
+#   print(Y$mu[k])
+#   new_draw <- rnorm( J , mean = Y$mu[k] , sd = (1/5)*Y$sd[k] )
+#   print("New Draw Results:")
+#   print(new_draw)
+# }
+
+
+
 ```
 
 ### Step 3: Update all $Y$ values to get $Y'$
@@ -117,58 +122,95 @@ Now that we have the generated new information $Y^P_k$, we need to combine it wi
 update_Y <- function(mu1, mu2, sigSq1, sigSq2){
   update_mu <- (mu1*sigSq2 + mu2*sigSq1)/(sigSq1 + sigSq2)
   update_sigSq <- (sigSq1*sigSq2)/(sigSq1 + sigSq2)
-  return(list(mu = update_mu, sigmaSq = update_sigSq))
+  return(list(mu = update_mu, sd = update_sigSq))
 }
-
-# Before update, Y_P is the same as Y
-Y_P <- Y
 
 # Calculate new data for all K new pilots
-for (k in K){
-
-  old_mean <- Y[k]
-  old_sigmaSq <- sigmaSq[k]
-  new_sigmaSq <- old_sigmaSq * (1/5)
-  new_mean <- rnorm( 1 , mean = old_mean , sd = new_sigmaSq )
-  print(update_Y(old_mean,new_mean,old_sigmaSq,new_sigmaSq))
-  Y_P[k] <- update_Y(old_mean,new_mean,old_sigmaSq,new_sigmaSq)
-  # print("Theta chosen from new pilot:")
-  # print(old_mean)
-  # print("SigmaSq from original Y")
-  # print(old_sigmaSq)
-  # print("New Draw Result:")
-  # print(new_draw)
+get_pilot_results <- function(K,Y){
+  # Before update, Y_P is the same as Y
+  Y_P <- Y
+  
+  # Update for each new pilot k
+  for (k in K){
+    
+    # Gather New Pilot Data
+    new_sigmaSq <- Y$sd[k] * (1/5)
+    new_mean <- rnorm( 1 , mean = Y$mu[k] , sd = new_sigmaSq )
+    
+    # Combine the old and new data 
+    post_pilot <- update_Y(Y$mu[k],new_mean,Y$sd[k],new_sigmaSq)
+    Y_P$mu[k] <- post_pilot$mu
+    Y_P$sd[k] <- post_pilot$sd
+    return(Y_P)
+  }
 }
+
+Y_P <- get_pilot_results(K,Y)
 print("updated Y")
-Y_P[2]$sigmaSq
-Y
-
-# Okay so the problem is I need Y to be a set of mu,sigma not just mu. RN just mu so error.
+Y_P
 ```
 
-```{r}
-x <- Y
-x
-```
 
 ### Step 4: Use $Y'$ to get final $\theta'$
 
 and once we have all the updated $Y'_i$ we can use them to get $\theta'_i$ based off of $\mu', \tau'^{2}$ with $Y' \sim N(\theta'_i, \sigma'_{i})$ 
 
 ```{r, eval = FALSE}
-updated_dat_generated <- list(J, I, Y_new, sigmaSq*(1/5))
+updated_dat_generated <- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
 fit_updated <- stan(file = 'randomEffectsModelConstrainedI.stan', 
             data = updated_dat_generated, 
-            iter = 1000, chains = 2)
+            iter = 100, chains = 2)
 fit_updated
 ```
  Now check if this update was worth. How? See if you change your mind.
  Intuitively:
-  - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest X number of cities
-  - So given we can implement in X cities, we 'change our mind' if the top X cites are different in this update than they are in the original prior set.
-  - Remember, Y contains the original data, and 
+  - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest C number of cities
+  - So given we can implement in C cities, we 'change our mind' if the top C cites are different in this update than they are in the original prior set.
+  - Remember, Y contains the original data, Y_updated has the Y' data.
+```{r}
+new_ranking <- function(fit_updated,Y_P) {
+  params_updated <- extract(fit_updated)
+  Y_updated <- Y_P
+  for (i in 1:length(Y_updated$mu)){
+    Y_updated$mu[i] <- mean(params_updated$theta[,i])
+    # TODO: do we update sigma as well??
+  }
+  
+  # print("Y Updated")
+  # print(Y_updated)
+  new_rank <- order(Y_updated$mu, decreasing=TRUE)
+  # print("new rank")
+  # print(new_rank)
+  # Returns true if the first C elems of both vectors contain the same elements (unordered)
+  return(new_rank)
+}
+```
+
 ```{r}
 
+
+change_mind <- function(K,Y,original_rank){
+  Y_P <- get_pilot_results(K,Y)
+  updated_dat_generated <- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+  fit_updated <- stan(file = 'randomEffectsModelConstrainedI.stan', 
+                      data = updated_dat_generated, 
+                      iter = 1000, chains = 2)
+  new_rank <- new_ranking(fit_updated,Y_P) 
+  print(new_rank)
+  return(!setequal(original_rank[1:C],new_rank[1:C]))
+}
+```
+
+```{r}
+original_rank <- order(Y$mu, decreasing=TRUE)
+original_rank
+combinations <-combn(seq(I),C)
+nmc <- 0
+for (i in 1:ncol(combinations)){
+  K <- combinations[,i]
+  nmc <- nmc + change_mind(K,Y,original_rank)
+} 
+nmc
 ```
 
 
