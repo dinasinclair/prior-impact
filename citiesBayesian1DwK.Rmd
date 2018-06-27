@@ -29,7 +29,7 @@ mu <- 10
 tauSq <- 2
 I <- 3
 J <- 1
-sigmaSq <- c(0.1,0.4,.2)
+sigmaSq <- runif(I)
 
 # Calculate theta, reshape sigmaSq
 theta <- rnorm(I, mu, tauSq)
@@ -66,6 +66,13 @@ fit <- stan(file = 'randomEffectsModelConstrainedI.stan',
             iter = 1000, chains = 2)
 fit
 ```
+```{r}
+# Readjust knowledge of Y based off of REM
+params <- extract(fit)
+for (i in 1:nrow(Y)){
+  Y[i] <- mean(params$theta[,i])
+}
+```
 
 
 ### Step 2: Pick $K$ studies to pilot, calculate $Y^P_k$
@@ -83,12 +90,10 @@ Here we're first going to go with the boring simple version where the subset K i
 # Define set K of cities to try the pilot on and collect more data
 K <- c(2)
 
-# Calculate new data for all K new pilots
-params <- extract(fit)
 for (k in K){
   print("Theta for new pilot:")
-  print(mean(params$theta[,k]))
-  new_draw <- rnorm( J , mean = mean(params$theta[,k]) , sd = (1/5)*sigmaSq[k] )
+  print(Y[k])
+  new_draw <- rnorm( J , mean = Y[k] , sd = (1/5)*sigmaSq[k] )
   print("New Draw Results:")
   print(new_draw)
 }
@@ -115,27 +120,36 @@ update_Y <- function(mu1, mu2, sigSq1, sigSq2){
   return(list(mu = update_mu, sigmaSq = update_sigSq))
 }
 
+# Before update, Y_P is the same as Y
+Y_P <- Y
+
 # Calculate new data for all K new pilots
 for (k in K){
 
-  old_mean <- mean(params$theta[,k])
+  old_mean <- Y[k]
   old_sigmaSq <- sigmaSq[k]
   new_sigmaSq <- old_sigmaSq * (1/5)
   new_mean <- rnorm( 1 , mean = old_mean , sd = new_sigmaSq )
-  Y_new <- update_Y(old_mean,new_mean,old_sigmaSq,new_sigmaSq)
-  
-  print("Theta chosen from new pilot:")
-  print(old_mean)
-  print("SigmaSq from original Y")
-  print(old_sigmaSq)
-  print("New Draw Result:")
-  print(new_draw)
+  print(update_Y(old_mean,new_mean,old_sigmaSq,new_sigmaSq))
+  Y_P[k] <- update_Y(old_mean,new_mean,old_sigmaSq,new_sigmaSq)
+  # print("Theta chosen from new pilot:")
+  # print(old_mean)
+  # print("SigmaSq from original Y")
+  # print(old_sigmaSq)
+  # print("New Draw Result:")
+  # print(new_draw)
 }
 print("updated Y")
-Y_new
+Y_P[2]$sigmaSq
+Y
 
+# Okay so the problem is I need Y to be a set of mu,sigma not just mu. RN just mu so error.
 ```
 
+```{r}
+x <- Y
+x
+```
 
 ### Step 4: Use $Y'$ to get final $\theta'$
 
@@ -151,10 +165,22 @@ fit_updated
  Now check if this update was worth. How? See if you change your mind.
  Intuitively:
   - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest X number of cities
+  - So given we can implement in X cities, we 'change our mind' if the top X cites are different in this update than they are in the original prior set.
+  - Remember, Y contains the original data, and 
 ```{r}
 
 ```
 
 
+Sidenote: How do you do permutation stuff in R?
+```{r}
+x <- c(1,2,3,4)
+c <-combn(x,3)
+#oh now all columns of C are all the permutations
+for (i in 1:ncol(c)){
+  print(c[,i])
+} 
+ncol(c)
+```
 
 
