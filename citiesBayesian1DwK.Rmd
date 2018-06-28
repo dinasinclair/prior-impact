@@ -27,13 +27,17 @@ We'll hope that we can recover mu and tauSq correctly!
 set.seed(17)
 mu <- 10
 tauSq <- 2
-C <- 2
-I <- 3
-J <- 1
-sigmaSq <- runif(I)
 
-# Calculate theta, reshape sigmaSq
-theta <- rnorm(I, mu, tauSq)
+# Set general constants
+C <- 2 # Number of pilots we can run
+D <- 2 # Number of cities we can implement the final program in
+I <- 3 # Number of studies (AKA number of cities)
+J <- 1 # Number of data points per study (Currently setting this to 1 for simplicity)
+num_hypothetical_draws <- 10 # Number of times you draw new pretend pilot study results
+
+# Generate theta and sigmaSq based off of mu, tau, I, J
+sigmaSq <- 100*runif(I) # For now, all sigma are ~U(0,1)
+theta <- rnorm(I, mu, tauSq) # and theta ~N(mu,tauSq)
 sigmaSq <- matrix(sigmaSq, I , J)
 theta <- matrix(theta, I , J)
 
@@ -41,15 +45,9 @@ theta <- matrix(theta, I , J)
 Y <- list(mu=theta, sd=sigmaSq)
 
 # Save our input data together in a list
-basic_dat_generated <- list(J,I,Y=theta,sigmaSq=sigmaSq)
+basic_dat_generated <- list(J=J,I=I,Y=theta,sigmaSq=sigmaSq)
 
-# Display the generated input data for reference
-# print("Theta:")
-# theta
-# print("SigmaSq:")
-# sigmaSq
-# print("Y:")
-# Y
+# Display what we've generated
 basic_dat_generated
 ```
 
@@ -89,7 +87,7 @@ $$ Y^P_i \sim N(\theta_i, \frac 1 5 \sigma_{i})$$
 Here we're first going to go with the boring simple version where the subset K is just k=2. So we keep $Y_1$, $Y_3$ unchanged but need to make a $Y'_2$ using the generated $\theta_2$. We use an arbitrary 5x smaller sigma in $Y'_2$ than in $Y_2$ as noted in the norm above
 ```{r}
 # Define set K of cities to try the pilot on and collect more data
-K <- c(2)
+# K <- c(2)
 
 
 # for (k in K){
@@ -159,7 +157,7 @@ and once we have all the updated $Y'_i$ we can use them to get $\theta'_i$ based
 updated_dat_generated <- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
 fit_updated <- stan(file = 'randomEffectsModelConstrainedI.stan', 
             data = updated_dat_generated, 
-            iter = 100, chains = 2)
+            iter = 100, chains = 2, verbose = FALSE)
 fit_updated
 ```
  Now check if this update was worth. How? See if you change your mind.
@@ -175,20 +173,12 @@ new_ranking <- function(fit_updated,Y_P) {
     Y_updated$mu[i] <- mean(params_updated$theta[,i])
     # TODO: do we update sigma as well??
   }
-  
-  # print("Y Updated")
-  # print(Y_updated)
   new_rank <- order(Y_updated$mu, decreasing=TRUE)
-  # print("new rank")
-  # print(new_rank)
-  # Returns true if the first C elems of both vectors contain the same elements (unordered)
   return(new_rank)
 }
 ```
 
 ```{r}
-
-
 change_mind <- function(K,Y,original_rank){
   Y_P <- get_pilot_results(K,Y)
   updated_dat_generated <- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
@@ -197,32 +187,35 @@ change_mind <- function(K,Y,original_rank){
                       iter = 1000, chains = 2)
   new_rank <- new_ranking(fit_updated,Y_P) 
   print(new_rank)
-  return(!setequal(original_rank[1:C],new_rank[1:C]))
+  return(!setequal(original_rank[1:D],new_rank[1:D]))
 }
 ```
+
 
 ```{r}
 original_rank <- order(Y$mu, decreasing=TRUE)
 original_rank
 combinations <-combn(seq(I),C)
-nmc <- 0
+nmc <- numeric(I)
 for (i in 1:ncol(combinations)){
-  K <- combinations[,i]
-  nmc <- nmc + change_mind(K,Y,original_rank)
+  for (j in 1:num_hypothetical_draws){
+    K <- combinations[,i]
+    nmc[i] <- nmc[i] + change_mind(K,Y,original_rank)
+  }
 } 
 nmc
 ```
 
 
-Sidenote: How do you do permutation stuff in R?
+Brief summary of the results
 ```{r}
-x <- c(1,2,3,4)
-c <-combn(x,3)
-#oh now all columns of C are all the permutations
-for (i in 1:ncol(c)){
-  print(c[,i])
+# So what are these results exactly?
+print(Y)
+for (i in 1:length(nmc)){
+  print(combinations[,i])
+  print(paste("Number of times minds changed: ",nmc[i],"/",num_hypothetical_draws))
 } 
-ncol(c)
+
 ```
 
 
