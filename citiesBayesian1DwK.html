@@ -124,18 +124,26 @@ $(document).ready(function () {
 </div>
 
 
+<div id="overview" class="section level3">
+<h3>Overview</h3>
+<p>Imagine the following: as a policymaker, you want to implement a new program in a subset of cities. To improve your knowledge of which cities would benefit the most from the program, you have the budget to run a pilot in some of the potential city choices, but not all of them. Given that you have pre-existing beliefs (priors) on how well you think the program will fare in each city, where should you run the pilot to glean the most information?</p>
+<p>Here, we tackle this question using a bayseian hierarchical model coded in a combination of R and Stan.</p>
+</div>
+<div id="tools" class="section level3">
+<h3>Tools</h3>
+<p>This code is written in R 3.3.2 using <a href="https://rmarkdown.rstudio.com/">R Markdown</a>. The bayesian modeling is coded up in a separate language called <a href="http://mc-stan.org/">Stan</a>. Stan’s specific tools for bayesian inference and modeling makes bayesian methods far more approachable than before. Here, we’re using the rstan library to allow us to interface easily between the main R code and the bayesian Stan files.</p>
 <pre class="r"><code>library(&quot;rstan&quot;)</code></pre>
+</div>
 <div id="inputs" class="section level3">
 <h3>Inputs</h3>
-<div id="notation" class="section level5">
-<h5>Notation</h5>
-<p>Given</p>
-<p><span class="math display">\[Y = (Y_1, \dots, Y_i) \]</span> where each <span class="math inline">\(Y_i\)</span> has its own given <span class="math inline">\(\sigma_{i}\)</span>,assume <span class="math inline">\(Y \sim N(\theta_i, \sigma_{i}^2)\)</span>.</p>
-<p>We won’t be looking at the individual data in any study, so we’ll essentially be assuming that the sample size for every study <span class="math inline">\(J = 1\)</span>. <span class="math inline">\(Y_i\)</span> is the <em>point estimation</em>, the mean of the study, and <span class="math inline">\(\sigma_i\)</span> is that study’s variance.</p>
-</div>
-<div id="arbitrary-example-inputs" class="section level5">
-<h5>Arbitrary Example Inputs</h5>
-<p>For now, we’ll use that classic arbitrary dataset I’ve been using We’ll hope that we can recover mu and tauSq correctly!</p>
+<p>For every city <span class="math inline">\(i\)</span>, we need to know</p>
+<ul>
+<li>A prior <span class="math inline">\(Y_i\)</span> that estimates the mean effect of the program on city <span class="math inline">\(i\)</span></li>
+<li>A standard error <span class="math inline">\(\sigma_i\)</span> for each of these point estimates <span class="math inline">\(Y_i\)</span></li>
+</ul>
+<div id="generating-example-inputs" class="section level5">
+<h5>Generating Example Inputs</h5>
+<p>In this model, we will be assuming that <span class="math display">\[Y \sim N(\mu, \tau^2)\]</span> or is it that <span class="math display">\[Y_i \sim N(\theta_i,\sigma^2_i) \text{ and } \theta_i \sim N(\mu,\tau^2)\]</span></p>
 <pre class="r"><code># Set input parameters
 set.seed(17)
 mu &lt;- 10
@@ -196,7 +204,7 @@ basic_dat_generated</code></pre>
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
-##                  from filec4043403982.cpp:8:
+##                  from file5988c93136f.cpp:8:
 ## C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: &quot;BOOST_NO_CXX11_RVALUE_REFERENCES&quot; redefined
 ##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
 ##  ^
@@ -222,9 +230,9 @@ basic_dat_generated</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.046 seconds (Warm-up)
-##                0.038 seconds (Sampling)
-##                0.084 seconds (Total)
+##  Elapsed Time: 0.04 seconds (Warm-up)
+##                0.035 seconds (Sampling)
+##                0.075 seconds (Total)
 ## 
 ## 
 ## SAMPLING FOR MODEL 'randomEffectsModelConstrainedI' NOW (CHAIN 2).
@@ -247,9 +255,9 @@ basic_dat_generated</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.046 seconds (Warm-up)
-##                0.052 seconds (Sampling)
-##                0.098 seconds (Total)</code></pre>
+##  Elapsed Time: 0.053 seconds (Warm-up)
+##                0.044 seconds (Sampling)
+##                0.097 seconds (Total)</code></pre>
 <pre><code>## Warning: There were 74 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. See
 ## http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</code></pre>
 <pre><code>## Warning: Examine the pairs() plot to diagnose sampling problems</code></pre>
@@ -266,7 +274,7 @@ basic_dat_generated</code></pre>
 ## theta[3]   9.68    0.24 3.64   1.35   8.09   9.83  11.98 16.21   222 1.02
 ## lp__     -15.06    0.34 3.15 -21.25 -17.31 -14.71 -12.66 -9.28    85 1.01
 ## 
-## Samples were drawn using NUTS(diag_e) at Thu Jul 05 10:28:14 2018.
+## Samples were drawn using NUTS(diag_e) at Thu Jul 05 12:49:06 2018.
 ## For each parameter, n_eff is a crude measure of effective sample size,
 ## and Rhat is the potential scale reduction factor on split chains (at 
 ## convergence, Rhat=1).</code></pre>

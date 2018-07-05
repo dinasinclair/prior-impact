@@ -6,6 +6,15 @@ output:
   html_document: default
   pdf_document: default
 ---
+### Overview
+
+Imagine the following: as a policymaker, you want to implement a new program in a subset of cities. To improve your knowledge of which cities would benefit the most from the program, you have the budget to run a pilot in some of the potential city choices, but not all of them. Given that you have pre-existing beliefs (priors) on how well you think the program will fare in each city, where should you run the pilot to glean the most information?
+
+Here, we tackle this question using a bayseian hierarchical model coded in a combination of R and Stan.
+
+### Tools
+
+This code is written in R 3.3.2 using [R Markdown](https://rmarkdown.rstudio.com/). The bayesian modeling is coded up in a separate language called [Stan](http://mc-stan.org/). Stan's specific tools for bayesian inference and modeling makes bayesian methods far more approachable than before. Here, we're using the rstan library to allow us to interface easily between the main R code and the bayesian Stan files.
 
 ```{r, warning = FALSE, message = FALSE}
 library("rstan")
@@ -13,17 +22,16 @@ library("rstan")
 
 ### Inputs
 
-##### Notation
-Given
+For every city $i$, we need to know
 
-$$Y = (Y_1, \dots, Y_i) $$
-where each $Y_i$ has its own given $\sigma_{i}$,assume $Y \sim N(\theta_i, \sigma_{i}^2)$.
+ * A prior $Y_i$ that estimates the mean effect of the program on city $i$
+ * A standard error $\sigma_i$ for each of these point estimates $Y_i$
 
-We won't be looking at the individual data in any study, so we'll essentially be assuming that the sample size for every study $J = 1$. $Y_i$ is the *point estimation*, the mean of the study, and $\sigma_i$ is that study's variance. 
-
-##### Arbitrary Example Inputs
-For now, we'll use that classic arbitrary dataset I've been using
-We'll hope that we can recover mu and tauSq correctly!
+##### Generating Example Inputs
+In this model, we will be assuming that
+$$Y \sim N(\mu, \tau^2)$$
+or is it that
+$$Y_i \sim N(\theta_i,\sigma^2_i) \text{ and } \theta_i \sim N(\mu,\tau^2)$$
 ```{r}
 # Set input parameters
 set.seed(17)
