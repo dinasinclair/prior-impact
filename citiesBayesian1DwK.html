@@ -206,7 +206,7 @@ basic_dat_generated</code></pre>
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
-##                  from file8ff4602d723c.cpp:8:
+##                  from filec23c641d5a06.cpp:8:
 ## C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: &quot;BOOST_NO_CXX11_RVALUE_REFERENCES&quot; redefined
 ##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
 ##  ^
@@ -232,9 +232,9 @@ basic_dat_generated</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.035 seconds (Warm-up)
-##                0.035 seconds (Sampling)
-##                0.07 seconds (Total)
+##  Elapsed Time: 0.037 seconds (Warm-up)
+##                0.037 seconds (Sampling)
+##                0.074 seconds (Total)
 ## 
 ## 
 ## SAMPLING FOR MODEL 'randomEffectsModel1D' NOW (CHAIN 2).
@@ -257,9 +257,9 @@ basic_dat_generated</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.032 seconds (Warm-up)
-##                0.033 seconds (Sampling)
-##                0.065 seconds (Total)</code></pre>
+##  Elapsed Time: 0.033 seconds (Warm-up)
+##                0.034 seconds (Sampling)
+##                0.067 seconds (Total)</code></pre>
 <pre><code>## Warning: There were 43 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. See
 ## http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</code></pre>
 <pre><code>## Warning: Examine the pairs() plot to diagnose sampling problems</code></pre>
@@ -277,7 +277,7 @@ basic_dat_generated</code></pre>
 ## theta[3]   8.95    0.19  4.21   0.18   6.86   9.06  11.21 18.21   477 1.00
 ## lp__     -13.94    0.44  3.38 -21.94 -15.89 -13.47 -11.53 -8.88    58 1.04
 ## 
-## Samples were drawn using NUTS(diag_e) at Thu Jul 05 18:25:03 2018.
+## Samples were drawn using NUTS(diag_e) at Thu Jul 05 18:53:30 2018.
 ## For each parameter, n_eff is a crude measure of effective sample size,
 ## and Rhat is the potential scale reduction factor on split chains (at 
 ## convergence, Rhat=1).</code></pre>
@@ -334,23 +334,20 @@ get_pilot_results &lt;- function(K,Y){
 </div>
 <div id="step-4-use-y-to-get-final-theta" class="section level3">
 <h3>Step 4: Use <span class="math inline">\(Y'\)</span> to get final <span class="math inline">\(\theta'\)</span></h3>
-<p>Once we have all the updated <span class="math inline">\(Y'_i\)</span> we can use them to get <span class="math inline">\(\theta'_i\)</span> based off of <span class="math inline">\(\mu', \tau'^{2}\)</span> with <span class="math inline">\(Y' \sim N(\theta'_i, \sigma'_{i})\)</span></p>
-<pre class="r"><code>updated_dat_generated &lt;- list(I, Y=Y_P$theta, sigmaSq=Y_P$var)
-fit_updated &lt;- stan(file = 'randomEffectsModel1D.stan', 
-            data = updated_dat_generated, 
-            iter = 100, chains = 2, verbose = FALSE)
-fit_updated</code></pre>
-<p>Now check if this update was worth. How? See if you change your mind. Intuitively: - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest C (num_pilots) number of cities - So given we can implement in C cities, we ‘change our mind’ if the top C cites are different in this update than they are in the original prior set. - Remember, Y contains the original data, Y_updated has the Y’ data.</p>
+<p>Once we have all the updated <span class="math inline">\(Y'_i\)</span> we can use them to get <span class="math inline">\(\theta'_i\)</span> based off of <span class="math inline">\(\mu', \tau'^{2}\)</span> with <span class="math inline">\(Y' \sim N(\theta'_i, \sigma'_{i})\)</span>, using the same randomEffectsModel1D.stan file as before. We can extract that fit as fit_updated, and use it to get the needed <span class="math inline">\(\theta'\)</span>.</p>
+<p>Once we update <span class="math inline">\(\theta\)</span> to <span class="math inline">\(\theta'\)</span>, we can look at the ranking of this end result - with our new knowledge, which cities do the best? Using the order function, we can rank the cities from best (highest value for <span class="math inline">\(\theta'\)</span>) to worst (lowest value for <span class="math inline">\(\theta'\)</span>). The new ranking is returned in the function below.</p>
 <pre class="r"><code>new_ranking &lt;- function(fit_updated,Y_P) {
   params_updated &lt;- extract(fit_updated)
   Y_updated &lt;- Y_P
   for (i in 1:length(Y_updated$theta)){
     Y_updated$theta[i] &lt;- mean(params_updated$theta[,i])
-    # TODO: do we update sigma as well??
   }
   new_rank &lt;- order(Y_updated$theta, decreasing=TRUE)
   return(new_rank)
 }</code></pre>
+<p>Once we have this ranking, we next need to ask - did the information from the pilots add value? In this case, we’re choosing to define the pilot information as valuable if the act of running the pilot studies changes which subset of cities we select for the final program implementation.</p>
+<p>In other words, we are looking at if the pilots <em>change our mind</em>. This happens when the cities that have the highest num_final values of <span class="math inline">\(\theta'\)</span> are different than the cities that originally had the highest num_final values of our initial <span class="math inline">\(\theta\)</span> priors.</p>
+<p>This function returns a boolean denoting if for a given subset of cities <span class="math inline">\(K\)</span> to run pilots in, we will change our mind as a result. Note that this relies on whatever draws happen in this specific instance of the pilot simulation, so for each given subset of cities <span class="math inline">\(K\)</span>, there is some probability that</p>
 <pre class="r"><code>change_mind &lt;- function(K,Y,original_rank){
   Y_P &lt;- get_pilot_results(K,Y)
   updated_dat_generated &lt;- list(I, Y=Y_P$theta, sigmaSq=Y_P$var)
