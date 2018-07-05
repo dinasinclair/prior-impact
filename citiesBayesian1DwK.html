@@ -134,6 +134,21 @@ $(document).ready(function () {
 <p>This code is written in R 3.3.2 using <a href="https://rmarkdown.rstudio.com/">R Markdown</a>. The bayesian modeling is coded up in a separate language called <a href="http://mc-stan.org/">Stan</a>. Stan’s specific tools for bayesian inference and modeling makes bayesian methods far more approachable than before. Here, we’re using the rstan library to allow us to interface easily between the main R code and the bayesian Stan files.</p>
 <pre class="r"><code>library(&quot;rstan&quot;)</code></pre>
 </div>
+<div id="constants" class="section level3">
+<h3>Constants</h3>
+<p>Before we input data into the model, we need to set a few key constants. These are:</p>
+<ul>
+<li><em>I</em>, the total number of cities we have priors on and are considering for the final program</li>
+<li><em>num_pilots</em>, the number of cities we can run a pilot program in</li>
+<li><em>num_final_cities</em>, the number of cities we can implement the final program in</li>
+<li><em>num_hypothetical_draws</em>, the number of times we’ll simulate the results of each potential pilot choice</li>
+</ul>
+<pre class="r"><code># Set general constants
+I &lt;- 3 # Number of cities
+num_pilots &lt;- 2 # Number of pilots
+num_final_cities &lt;- 2 # Number of cities we can implement the final program in
+num_hypothetical_draws &lt;- 15 # Number of times you simulate pilot study results</code></pre>
+</div>
 <div id="inputs" class="section level3">
 <h3>Inputs</h3>
 <p>For every city <span class="math inline">\(i\)</span>, we need to know</p>
@@ -149,51 +164,33 @@ set.seed(17)
 mu &lt;- 10
 tauSq &lt;- 2
 
-# Set general constants
-C &lt;- 2 # Number of pilots we can run
-D &lt;- 2 # Number of cities we can implement the final program in
-I &lt;- 3 # Number of studies (AKA number of cities)
-J &lt;- 1 # Number of data points per study (Currently setting this to 1 for simplicity)
-num_hypothetical_draws &lt;- 15 # Number of times you draw new pretend pilot study results
-
-# Generate theta and sigmaSq based off of mu, tau, I, J
+# Generate theta and sigmaSq based off of mu, tau, I
 sigmaSq &lt;- 10*runif(I) # For now, all sigma are ~U(0,1)
 theta &lt;- rnorm(I, mu, tauSq) # and theta ~N(mu,tauSq)
-sigmaSq &lt;- matrix(sigmaSq, I , J)
-theta &lt;- matrix(theta, I , J)
 
 # Calculate and reshape Y
 Y &lt;- list(mu=theta, sd=sigmaSq)
 
 # Save our input data together in a list
-basic_dat_generated &lt;- list(J=J,I=I,Y=theta,sigmaSq=sigmaSq)
+basic_dat_generated &lt;- list(I=I,Y=theta,sigmaSq=sigmaSq)
 
 # Display what we've generated
 basic_dat_generated</code></pre>
-<pre><code>## $J
-## [1] 1
-## 
-## $I
+<pre><code>## $I
 ## [1] 3
 ## 
 ## $Y
-##           [,1]
-## [1,] 11.522993
-## [2,] 10.194808
-## [3,]  8.222759
+## [1] 11.522993 10.194808  8.222759
 ## 
 ## $sigmaSq
-##          [,1]
-## [1,] 1.550508
-## [2,] 9.683788
-## [3,] 4.682631</code></pre>
+## [1] 1.550508 9.683788 4.682631</code></pre>
 </div>
 </div>
 <div id="step-1-calculate-theta_i-mu-tau2-using-the-original-priors-y" class="section level3">
 <h3>Step 1: Calculate <span class="math inline">\(\theta_i, \mu, \tau^2\)</span> using the original priors Y</h3>
 <p>We’re assuming a <strong>random effects model</strong>, that is that <span class="math display">\[\theta_i \sim N(\mu, \tau^2) \text{ and } Y_i \sim N(\theta_i, \sigma_{i}^2)\]</span></p>
 <p>To make use of this assumption, we need to estimate scalars <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span> along with the vector <span class="math inline">\(\theta = (\theta_1,\dots,\theta_N)\)</span>. We can do this using stan!</p>
-<pre class="r"><code>fit &lt;- stan(file = 'randomEffectsModelConstrainedI.stan', 
+<pre class="r"><code>fit &lt;- stan(file = 'randomEffectsModel1D.stan', 
             data = basic_dat_generated, 
             iter = 1000, chains = 2)</code></pre>
 <pre><code>## In file included from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config.hpp:39:0,
@@ -204,13 +201,13 @@ basic_dat_generated</code></pre>
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
-##                  from file5988c93136f.cpp:8:
+##                  from file166859f45ad4.cpp:8:
 ## C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: &quot;BOOST_NO_CXX11_RVALUE_REFERENCES&quot; redefined
 ##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
 ##  ^
 ## &lt;command-line&gt;:0:0: note: this is the location of the previous definition
 ## 
-## SAMPLING FOR MODEL 'randomEffectsModelConstrainedI' NOW (CHAIN 1).
+## SAMPLING FOR MODEL 'randomEffectsModel1D' NOW (CHAIN 1).
 ## 
 ## Gradient evaluation took 0 seconds
 ## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
@@ -231,11 +228,11 @@ basic_dat_generated</code></pre>
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
 ##  Elapsed Time: 0.04 seconds (Warm-up)
-##                0.035 seconds (Sampling)
-##                0.075 seconds (Total)
+##                0.034 seconds (Sampling)
+##                0.074 seconds (Total)
 ## 
 ## 
-## SAMPLING FOR MODEL 'randomEffectsModelConstrainedI' NOW (CHAIN 2).
+## SAMPLING FOR MODEL 'randomEffectsModel1D' NOW (CHAIN 2).
 ## 
 ## Gradient evaluation took 0 seconds
 ## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
@@ -255,14 +252,14 @@ basic_dat_generated</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.053 seconds (Warm-up)
-##                0.044 seconds (Sampling)
-##                0.097 seconds (Total)</code></pre>
+##  Elapsed Time: 0.046 seconds (Warm-up)
+##                0.045 seconds (Sampling)
+##                0.091 seconds (Total)</code></pre>
 <pre><code>## Warning: There were 74 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. See
 ## http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</code></pre>
 <pre><code>## Warning: Examine the pairs() plot to diagnose sampling problems</code></pre>
 <pre class="r"><code>fit</code></pre>
-<pre><code>## Inference for Stan model: randomEffectsModelConstrainedI.
+<pre><code>## Inference for Stan model: randomEffectsModel1D.
 ## 2 chains, each with iter=1000; warmup=500; thin=1; 
 ## post-warmup draws per chain=500, total post-warmup draws=1000.
 ## 
@@ -274,7 +271,7 @@ basic_dat_generated</code></pre>
 ## theta[3]   9.68    0.24 3.64   1.35   8.09   9.83  11.98 16.21   222 1.02
 ## lp__     -15.06    0.34 3.15 -21.25 -17.31 -14.71 -12.66 -9.28    85 1.01
 ## 
-## Samples were drawn using NUTS(diag_e) at Thu Jul 05 12:49:06 2018.
+## Samples were drawn using NUTS(diag_e) at Thu Jul 05 15:52:41 2018.
 ## For each parameter, n_eff is a crude measure of effective sample size,
 ## and Rhat is the potential scale reduction factor on split chains (at 
 ## convergence, Rhat=1).</code></pre>
@@ -286,16 +283,10 @@ for (i in 1:length(Y$mu)){
 # TODO: Do we need to update the sd at all here post basic fit?
 Y</code></pre>
 <pre><code>## $mu
-##           [,1]
-## [1,] 11.176597
-## [2,] 10.555695
-## [3,]  9.676882
+## [1] 11.176597 10.555695  9.676882
 ## 
 ## $sd
-##          [,1]
-## [1,] 1.550508
-## [2,] 9.683788
-## [3,] 4.682631</code></pre>
+## [1] 1.550508 9.683788 4.682631</code></pre>
 </div>
 <div id="step-2-pick-k-studies-to-pilot-calculate-yp_k" class="section level3">
 <h3>Step 2: Pick <span class="math inline">\(K\)</span> studies to pilot, calculate <span class="math inline">\(Y^P_k\)</span></h3>
@@ -361,12 +352,12 @@ get_pilot_results &lt;- function(K,Y){
 <div id="step-4-use-y-to-get-final-theta" class="section level3">
 <h3>Step 4: Use <span class="math inline">\(Y'\)</span> to get final <span class="math inline">\(\theta'\)</span></h3>
 <p>and once we have all the updated <span class="math inline">\(Y'_i\)</span> we can use them to get <span class="math inline">\(\theta'_i\)</span> based off of <span class="math inline">\(\mu', \tau'^{2}\)</span> with <span class="math inline">\(Y' \sim N(\theta'_i, \sigma'_{i})\)</span></p>
-<pre class="r"><code>updated_dat_generated &lt;- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
-fit_updated &lt;- stan(file = 'randomEffectsModelConstrainedI.stan', 
+<pre class="r"><code>updated_dat_generated &lt;- list(I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+fit_updated &lt;- stan(file = 'randomEffectsModel1D.stan', 
             data = updated_dat_generated, 
             iter = 100, chains = 2, verbose = FALSE)
 fit_updated</code></pre>
-<p>Now check if this update was worth. How? See if you change your mind. Intuitively: - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest C number of cities - So given we can implement in C cities, we ‘change our mind’ if the top C cites are different in this update than they are in the original prior set. - Remember, Y contains the original data, Y_updated has the Y’ data.</p>
+<p>Now check if this update was worth. How? See if you change your mind. Intuitively: - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest C (num_pilots) number of cities - So given we can implement in C cities, we ‘change our mind’ if the top C cites are different in this update than they are in the original prior set. - Remember, Y contains the original data, Y_updated has the Y’ data.</p>
 <pre class="r"><code>new_ranking &lt;- function(fit_updated,Y_P) {
   params_updated &lt;- extract(fit_updated)
   Y_updated &lt;- Y_P
@@ -379,17 +370,17 @@ fit_updated</code></pre>
 }</code></pre>
 <pre class="r"><code>change_mind &lt;- function(K,Y,original_rank){
   Y_P &lt;- get_pilot_results(K,Y)
-  updated_dat_generated &lt;- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
-  fit_updated &lt;- stan(file = 'randomEffectsModelConstrainedI.stan', 
+  updated_dat_generated &lt;- list(I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+  fit_updated &lt;- stan(file = 'randomEffectsModel1D.stan', 
                       data = updated_dat_generated, 
                       iter = 1000, chains = 2)
   new_rank &lt;- new_ranking(fit_updated,Y_P) 
   print(new_rank)
-  return(!setequal(original_rank[1:D],new_rank[1:D]))
+  return(!setequal(original_rank[1:num_final_cities],new_rank[1:num_final_cities]))
 }</code></pre>
 <pre class="r"><code>original_rank &lt;- order(Y$mu, decreasing=TRUE)
 original_rank
-combinations &lt;-combn(seq(I),C)
+combinations &lt;-combn(seq(I),num_pilots)
 nmc &lt;- numeric(I)
 for (i in 1:ncol(combinations)){
   for (j in 1:num_hypothetical_draws){
@@ -402,16 +393,10 @@ nmc</code></pre>
 <pre class="r"><code># So what are these results exactly?
 print(Y)</code></pre>
 <pre><code>## $mu
-##           [,1]
-## [1,] 11.176597
-## [2,] 10.555695
-## [3,]  9.676882
+## [1] 11.176597 10.555695  9.676882
 ## 
 ## $sd
-##          [,1]
-## [1,] 1.550508
-## [2,] 9.683788
-## [3,] 4.682631</code></pre>
+## [1] 1.550508 9.683788 4.682631</code></pre>
 <pre class="r"><code>for (i in 1:length(nmc)){
   print(combinations[,i])
   print(paste(&quot;Number of times minds changed: &quot;,nmc[i],&quot;/&quot;,num_hypothetical_draws))

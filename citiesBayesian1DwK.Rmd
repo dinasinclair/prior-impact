@@ -20,6 +20,24 @@ This code is written in R 3.3.2 using [R Markdown](https://rmarkdown.rstudio.com
 library("rstan")
 ```
 
+### Constants
+
+Before we input data into the model, we need to set a few key constants. These are:
+
+* *I*, the total number of cities we have priors on and are considering for the final program
+* *num_pilots*, the number of cities we can run a pilot program in
+* *num_final_cities*, the number of cities we can implement the final program in
+* *num_hypothetical_draws*, the number of times we'll simulate the results of each potential pilot choice
+
+
+```{r}
+# Set general constants
+I <- 3 # Number of cities
+num_pilots <- 2 # Number of pilots
+num_final_cities <- 2 # Number of cities we can implement the final program in
+num_hypothetical_draws <- 15 # Number of times you simulate pilot study results
+```
+
 ### Inputs
 
 For every city $i$, we need to know
@@ -32,34 +50,28 @@ In this model, we will be assuming that
 $$Y \sim N(\mu, \tau^2)$$
 or is it that
 $$Y_i \sim N(\theta_i,\sigma^2_i) \text{ and } \theta_i \sim N(\mu,\tau^2)$$
+
+
 ```{r}
 # Set input parameters
 set.seed(17)
 mu <- 10
 tauSq <- 2
 
-# Set general constants
-C <- 2 # Number of pilots we can run
-D <- 2 # Number of cities we can implement the final program in
-I <- 3 # Number of studies (AKA number of cities)
-J <- 1 # Number of data points per study (Currently setting this to 1 for simplicity)
-num_hypothetical_draws <- 15 # Number of times you draw new pretend pilot study results
-
-# Generate theta and sigmaSq based off of mu, tau, I, J
+# Generate theta and sigmaSq based off of mu, tau, I
 sigmaSq <- 10*runif(I) # For now, all sigma are ~U(0,1)
 theta <- rnorm(I, mu, tauSq) # and theta ~N(mu,tauSq)
-sigmaSq <- matrix(sigmaSq, I , J)
-theta <- matrix(theta, I , J)
 
 # Calculate and reshape Y
 Y <- list(mu=theta, sd=sigmaSq)
 
 # Save our input data together in a list
-basic_dat_generated <- list(J=J,I=I,Y=theta,sigmaSq=sigmaSq)
+basic_dat_generated <- list(I=I,Y=theta,sigmaSq=sigmaSq)
 
 # Display what we've generated
 basic_dat_generated
 ```
+
 
 ### Step 1: Calculate $\theta_i, \mu, \tau^2$ using the original priors Y
 
@@ -68,7 +80,7 @@ We're assuming a **random effects model**, that is that $$\theta_i \sim N(\mu, \
 To make use of this assumption, we need to estimate scalars $\mu$ and $\tau^2$ along with the vector $\theta = (\theta_1,\dots,\theta_N)$. We can do this using stan!
 
 ```{r}
-fit <- stan(file = 'randomEffectsModelConstrainedI.stan', 
+fit <- stan(file = 'randomEffectsModel1D.stan', 
             data = basic_dat_generated, 
             iter = 1000, chains = 2)
 fit
@@ -164,17 +176,19 @@ get_pilot_results <- function(K,Y){
 and once we have all the updated $Y'_i$ we can use them to get $\theta'_i$ based off of $\mu', \tau'^{2}$ with $Y' \sim N(\theta'_i, \sigma'_{i})$ 
 
 ```{r, eval = FALSE}
-updated_dat_generated <- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
-fit_updated <- stan(file = 'randomEffectsModelConstrainedI.stan', 
+updated_dat_generated <- list(I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+fit_updated <- stan(file = 'randomEffectsModel1D.stan', 
             data = updated_dat_generated, 
             iter = 100, chains = 2, verbose = FALSE)
 fit_updated
 ```
+
  Now check if this update was worth. How? See if you change your mind.
  Intuitively:
-  - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest C number of cities
+  - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest C (num_pilots) number of cities
   - So given we can implement in C cities, we 'change our mind' if the top C cites are different in this update than they are in the original prior set.
   - Remember, Y contains the original data, Y_updated has the Y' data.
+  
 ```{r}
 new_ranking <- function(fit_updated,Y_P) {
   params_updated <- extract(fit_updated)
@@ -191,13 +205,13 @@ new_ranking <- function(fit_updated,Y_P) {
 ```{r}
 change_mind <- function(K,Y,original_rank){
   Y_P <- get_pilot_results(K,Y)
-  updated_dat_generated <- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
-  fit_updated <- stan(file = 'randomEffectsModelConstrainedI.stan', 
+  updated_dat_generated <- list(I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+  fit_updated <- stan(file = 'randomEffectsModel1D.stan', 
                       data = updated_dat_generated, 
                       iter = 1000, chains = 2)
   new_rank <- new_ranking(fit_updated,Y_P) 
   print(new_rank)
-  return(!setequal(original_rank[1:D],new_rank[1:D]))
+  return(!setequal(original_rank[1:num_final_cities],new_rank[1:num_final_cities]))
 }
 ```
 
@@ -205,7 +219,7 @@ change_mind <- function(K,Y,original_rank){
 ```{r, results="hide", warning = FALSE}
 original_rank <- order(Y$mu, decreasing=TRUE)
 original_rank
-combinations <-combn(seq(I),C)
+combinations <-combn(seq(I),num_pilots)
 nmc <- numeric(I)
 for (i in 1:ncol(combinations)){
   for (j in 1:num_hypothetical_draws){
