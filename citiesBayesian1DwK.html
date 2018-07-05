@@ -11,6 +11,7 @@
 
 <meta name="author" content="Dina Sinclair" />
 
+<meta name="date" content="2018-07-05" />
 
 <title>Bayesian Cities Model 1D</title>
 
@@ -118,7 +119,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">Bayesian Cities Model 1D</h1>
 <h4 class="author"><em>Dina Sinclair</em></h4>
-<h4 class="date"><em>June 9, 2018</em></h4>
+<h4 class="date"><em>2018-07-05</em></h4>
 
 </div>
 
@@ -139,43 +140,45 @@ $(document).ready(function () {
 set.seed(17)
 mu &lt;- 10
 tauSq &lt;- 2
-I &lt;- 3
-J &lt;- 1
-sigmaSq &lt;- c(0.1,0.4,.2)
 
-# Calculate theta, reshape sigmaSq
-theta &lt;- rnorm(I, mu, tauSq)
+# Set general constants
+C &lt;- 2 # Number of pilots we can run
+D &lt;- 2 # Number of cities we can implement the final program in
+I &lt;- 3 # Number of studies (AKA number of cities)
+J &lt;- 1 # Number of data points per study (Currently setting this to 1 for simplicity)
+num_hypothetical_draws &lt;- 15 # Number of times you draw new pretend pilot study results
+
+# Generate theta and sigmaSq based off of mu, tau, I, J
+sigmaSq &lt;- 10*runif(I) # For now, all sigma are ~U(0,1)
+theta &lt;- rnorm(I, mu, tauSq) # and theta ~N(mu,tauSq)
 sigmaSq &lt;- matrix(sigmaSq, I , J)
+theta &lt;- matrix(theta, I , J)
 
 # Calculate and reshape Y
-Y_vect &lt;- numeric()
-for(i in 1:I){
-  Y_vect &lt;- c(Y_vect, rnorm(J,mean=theta[i],sd=sigmaSq[i,]))
-}
-Y &lt;- matrix(Y_vect , I, J, byrow = TRUE)
+Y &lt;- list(mu=theta, sd=sigmaSq)
 
 # Save our input data together in a list
-basic_dat_generated &lt;- list(J,I,Y,sigmaSq)
+basic_dat_generated &lt;- list(J=J,I=I,Y=theta,sigmaSq=sigmaSq)
 
-# Display the generated input data for reference
-print(&quot;Theta:&quot;)</code></pre>
-<pre><code>## [1] &quot;Theta:&quot;</code></pre>
-<pre class="r"><code>theta</code></pre>
-<pre><code>## [1] 7.969983 9.840727 9.534026</code></pre>
-<pre class="r"><code>print(&quot;SigmaSq:&quot;)</code></pre>
-<pre><code>## [1] &quot;SigmaSq:&quot;</code></pre>
-<pre class="r"><code>sigmaSq</code></pre>
-<pre><code>##      [,1]
-## [1,]  0.1
-## [2,]  0.4
-## [3,]  0.2</code></pre>
-<pre class="r"><code>print(&quot;Y:&quot;)</code></pre>
-<pre><code>## [1] &quot;Y:&quot;</code></pre>
-<pre class="r"><code>Y</code></pre>
-<pre><code>##           [,1]
-## [1,]  7.888256
-## [2,] 10.149563
-## [3,]  9.500904</code></pre>
+# Display what we've generated
+basic_dat_generated</code></pre>
+<pre><code>## $J
+## [1] 1
+## 
+## $I
+## [1] 3
+## 
+## $Y
+##           [,1]
+## [1,] 11.522993
+## [2,] 10.194808
+## [3,]  8.222759
+## 
+## $sigmaSq
+##          [,1]
+## [1,] 1.550508
+## [2,] 9.683788
+## [3,] 4.682631</code></pre>
 </div>
 </div>
 <div id="step-1-calculate-theta_i-mu-tau2-using-the-original-priors-y" class="section level3">
@@ -193,7 +196,7 @@ print(&quot;Theta:&quot;)</code></pre>
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
-##                  from filec5b05dec25ff.cpp:8:
+##                  from filec4043403982.cpp:8:
 ## C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: &quot;BOOST_NO_CXX11_RVALUE_REFERENCES&quot; redefined
 ##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
 ##  ^
@@ -219,9 +222,9 @@ print(&quot;Theta:&quot;)</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.067 seconds (Warm-up)
-##                0.033 seconds (Sampling)
-##                0.1 seconds (Total)
+##  Elapsed Time: 0.046 seconds (Warm-up)
+##                0.038 seconds (Sampling)
+##                0.084 seconds (Total)
 ## 
 ## 
 ## SAMPLING FOR MODEL 'randomEffectsModelConstrainedI' NOW (CHAIN 2).
@@ -244,26 +247,47 @@ print(&quot;Theta:&quot;)</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.081 seconds (Warm-up)
-##                0.065 seconds (Sampling)
-##                0.146 seconds (Total)</code></pre>
+##  Elapsed Time: 0.046 seconds (Warm-up)
+##                0.052 seconds (Sampling)
+##                0.098 seconds (Total)</code></pre>
+<pre><code>## Warning: There were 74 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. See
+## http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</code></pre>
+<pre><code>## Warning: Examine the pairs() plot to diagnose sampling problems</code></pre>
 <pre class="r"><code>fit</code></pre>
 <pre><code>## Inference for Stan model: randomEffectsModelConstrainedI.
 ## 2 chains, each with iter=1000; warmup=500; thin=1; 
 ## post-warmup draws per chain=500, total post-warmup draws=1000.
 ## 
-##           mean se_mean   sd  2.5%   25%   50%   75% 97.5% n_eff Rhat
-## mu        9.07    0.14 2.27  5.67  8.52  9.16  9.79 12.63   251 1.01
-## tau       1.46    0.05 0.69  0.79  1.05  1.28  1.65  3.38   179 1.00
-## theta[1]  7.90    0.00 0.10  7.72  7.83  7.90  7.97  8.10   732 1.00
-## theta[2] 10.06    0.02 0.39  9.28  9.81 10.07 10.34 10.82   502 1.00
-## theta[3]  9.49    0.01 0.20  9.10  9.37  9.49  9.63  9.86   918 1.00
-## lp__     -4.96    0.12 1.84 -9.28 -6.06 -4.57 -3.50 -2.52   223 1.00
+##            mean se_mean   sd   2.5%    25%    50%    75% 97.5% n_eff Rhat
+## mu        10.51    0.26 6.54  -2.71   8.76  10.49  12.66 25.63   638 1.00
+## tau        2.22    0.13 1.46   0.76   1.22   1.75   2.76  6.02   137 1.00
+## theta[1]  11.18    0.12 1.52   8.17  10.11  11.02  12.23 14.20   168 1.00
+## theta[2]  10.56    0.26 5.05  -0.65   8.15  10.50  13.01 20.91   379 1.00
+## theta[3]   9.68    0.24 3.64   1.35   8.09   9.83  11.98 16.21   222 1.02
+## lp__     -15.06    0.34 3.15 -21.25 -17.31 -14.71 -12.66 -9.28    85 1.01
 ## 
-## Samples were drawn using NUTS(diag_e) at Wed Jun 27 14:16:47 2018.
+## Samples were drawn using NUTS(diag_e) at Thu Jul 05 10:28:14 2018.
 ## For each parameter, n_eff is a crude measure of effective sample size,
 ## and Rhat is the potential scale reduction factor on split chains (at 
 ## convergence, Rhat=1).</code></pre>
+<pre class="r"><code># Readjust knowledge of Y based off of REM
+params &lt;- extract(fit)
+for (i in 1:length(Y$mu)){
+  Y$mu[i] &lt;- mean(params$theta[,i])
+}
+# TODO: Do we need to update the sd at all here post basic fit?
+Y</code></pre>
+<pre><code>## $mu
+##           [,1]
+## [1,] 11.176597
+## [2,] 10.555695
+## [3,]  9.676882
+## 
+## $sd
+##          [,1]
+## [1,] 1.550508
+## [2,] 9.683788
+## [3,] 4.682631</code></pre>
 </div>
 <div id="step-2-pick-k-studies-to-pilot-calculate-yp_k" class="section level3">
 <h3>Step 2: Pick <span class="math inline">\(K\)</span> studies to pilot, calculate <span class="math inline">\(Y^P_k\)</span></h3>
@@ -276,21 +300,16 @@ print(&quot;Theta:&quot;)</code></pre>
 <h5>Concretely</h5>
 <p>Here we’re first going to go with the boring simple version where the subset K is just k=2. So we keep <span class="math inline">\(Y_1\)</span>, <span class="math inline">\(Y_3\)</span> unchanged but need to make a <span class="math inline">\(Y'_2\)</span> using the generated <span class="math inline">\(\theta_2\)</span>. We use an arbitrary 5x smaller sigma in <span class="math inline">\(Y'_2\)</span> than in <span class="math inline">\(Y_2\)</span> as noted in the norm above</p>
 <pre class="r"><code># Define set K of cities to try the pilot on and collect more data
-K &lt;- c(2)
+# K &lt;- c(2)
 
-# Calculate new data for all K new pilots
-params &lt;- extract(fit)
-for (k in K){
-  print(&quot;Theta for new pilot:&quot;)
-  print(mean(params$theta[,k]))
-  new_draw &lt;- rnorm( J , mean = mean(params$theta[,k]) , sd = (1/5)*sigmaSq[k] )
-  print(&quot;New Draw Results:&quot;)
-  print(new_draw)
-}</code></pre>
-<pre><code>## [1] &quot;Theta for new pilot:&quot;
-## [1] 10.06408
-## [1] &quot;New Draw Results:&quot;
-## [1] 9.938327</code></pre>
+
+# for (k in K){
+#   print(&quot;Theta for new pilot:&quot;)
+#   print(Y$mu[k])
+#   new_draw &lt;- rnorm( J , mean = Y$mu[k] , sd = (1/5)*Y$sd[k] )
+#   print(&quot;New Draw Results:&quot;)
+#   print(new_draw)
+# }</code></pre>
 </div>
 </div>
 <div id="step-3-update-all-y-values-to-get-y" class="section level3">
@@ -303,50 +322,98 @@ for (k in K){
 <pre class="r"><code>update_Y &lt;- function(mu1, mu2, sigSq1, sigSq2){
   update_mu &lt;- (mu1*sigSq2 + mu2*sigSq1)/(sigSq1 + sigSq2)
   update_sigSq &lt;- (sigSq1*sigSq2)/(sigSq1 + sigSq2)
-  return(list(mu = update_mu, sigmaSq = update_sigSq))
+  return(list(mu = update_mu, sd = update_sigSq))
 }
 
 # Calculate new data for all K new pilots
-for (k in K){
-
-  old_mean &lt;- mean(params$theta[,k])
-  old_sigmaSq &lt;- sigmaSq[k]
-  new_sigmaSq &lt;- old_sigmaSq * (1/5)
-  new_mean &lt;- rnorm( 1 , mean = old_mean , sd = new_sigmaSq )
-  Y_new &lt;- update_Y(old_mean,new_mean,old_sigmaSq,new_sigmaSq)
+get_pilot_results &lt;- function(K,Y){
+  # Before update, Y_P is the same as Y
+  Y_P &lt;- Y
   
-  print(&quot;Theta chosen from new pilot:&quot;)
-  print(old_mean)
-  print(&quot;SigmaSq from original Y&quot;)
-  print(old_sigmaSq)
-  print(&quot;New Draw Result:&quot;)
-  print(new_draw)
-}</code></pre>
-<pre><code>## [1] &quot;Theta chosen from new pilot:&quot;
-## [1] 10.06408
-## [1] &quot;SigmaSq from original Y&quot;
-## [1] 0.4
-## [1] &quot;New Draw Result:&quot;
-## [1] 9.938327</code></pre>
-<pre class="r"><code>print(&quot;updated Y&quot;)</code></pre>
-<pre><code>## [1] &quot;updated Y&quot;</code></pre>
-<pre class="r"><code>Y_new</code></pre>
-<pre><code>## $mu
-## [1] 10.09236
-## 
-## $sigmaSq
-## [1] 0.06666667</code></pre>
+  # Update for each new pilot k
+  for (k in K){
+    
+    # Gather New Pilot Data
+    new_sigmaSq &lt;- Y$sd[k] * (1/5)
+    new_mean &lt;- rnorm( 1 , mean = Y$mu[k] , sd = new_sigmaSq )
+    
+    # Combine the old and new data 
+    post_pilot &lt;- update_Y(Y$mu[k],new_mean,Y$sd[k],new_sigmaSq)
+    Y_P$mu[k] &lt;- post_pilot$mu
+    Y_P$sd[k] &lt;- post_pilot$sd
+    return(Y_P)
+  }
+}
+
+# Y_P &lt;- get_pilot_results(K,Y)
+# print(&quot;updated Y&quot;)
+# Y_P</code></pre>
 </div>
 </div>
 <div id="step-4-use-y-to-get-final-theta" class="section level3">
 <h3>Step 4: Use <span class="math inline">\(Y'\)</span> to get final <span class="math inline">\(\theta'\)</span></h3>
 <p>and once we have all the updated <span class="math inline">\(Y'_i\)</span> we can use them to get <span class="math inline">\(\theta'_i\)</span> based off of <span class="math inline">\(\mu', \tau'^{2}\)</span> with <span class="math inline">\(Y' \sim N(\theta'_i, \sigma'_{i})\)</span></p>
-<pre class="r"><code>updated_dat_generated &lt;- list(J, I, Y_new, sigmaSq*(1/5))
+<pre class="r"><code>updated_dat_generated &lt;- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
 fit_updated &lt;- stan(file = 'randomEffectsModelConstrainedI.stan', 
             data = updated_dat_generated, 
-            iter = 1000, chains = 2)
+            iter = 100, chains = 2, verbose = FALSE)
 fit_updated</code></pre>
-<p>Now check if this update was worth. How? See if you change your mind. Intuitively: - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest X number of cities</p>
+<p>Now check if this update was worth. How? See if you change your mind. Intuitively: - see if new prior switches which cities have positive impacts, or see if this changes which cities are in the highest C number of cities - So given we can implement in C cities, we ‘change our mind’ if the top C cites are different in this update than they are in the original prior set. - Remember, Y contains the original data, Y_updated has the Y’ data.</p>
+<pre class="r"><code>new_ranking &lt;- function(fit_updated,Y_P) {
+  params_updated &lt;- extract(fit_updated)
+  Y_updated &lt;- Y_P
+  for (i in 1:length(Y_updated$mu)){
+    Y_updated$mu[i] &lt;- mean(params_updated$theta[,i])
+    # TODO: do we update sigma as well??
+  }
+  new_rank &lt;- order(Y_updated$mu, decreasing=TRUE)
+  return(new_rank)
+}</code></pre>
+<pre class="r"><code>change_mind &lt;- function(K,Y,original_rank){
+  Y_P &lt;- get_pilot_results(K,Y)
+  updated_dat_generated &lt;- list(J, I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+  fit_updated &lt;- stan(file = 'randomEffectsModelConstrainedI.stan', 
+                      data = updated_dat_generated, 
+                      iter = 1000, chains = 2)
+  new_rank &lt;- new_ranking(fit_updated,Y_P) 
+  print(new_rank)
+  return(!setequal(original_rank[1:D],new_rank[1:D]))
+}</code></pre>
+<pre class="r"><code>original_rank &lt;- order(Y$mu, decreasing=TRUE)
+original_rank
+combinations &lt;-combn(seq(I),C)
+nmc &lt;- numeric(I)
+for (i in 1:ncol(combinations)){
+  for (j in 1:num_hypothetical_draws){
+    K &lt;- combinations[,i]
+    nmc[i] &lt;- nmc[i] + change_mind(K,Y,original_rank)
+  }
+} 
+nmc</code></pre>
+<p>Brief summary of the results</p>
+<pre class="r"><code># So what are these results exactly?
+print(Y)</code></pre>
+<pre><code>## $mu
+##           [,1]
+## [1,] 11.176597
+## [2,] 10.555695
+## [3,]  9.676882
+## 
+## $sd
+##          [,1]
+## [1,] 1.550508
+## [2,] 9.683788
+## [3,] 4.682631</code></pre>
+<pre class="r"><code>for (i in 1:length(nmc)){
+  print(combinations[,i])
+  print(paste(&quot;Number of times minds changed: &quot;,nmc[i],&quot;/&quot;,num_hypothetical_draws))
+} </code></pre>
+<pre><code>## [1] 1 2
+## [1] &quot;Number of times minds changed:  1 / 15&quot;
+## [1] 1 3
+## [1] &quot;Number of times minds changed:  0 / 15&quot;
+## [1] 2 3
+## [1] &quot;Number of times minds changed:  7 / 15&quot;</code></pre>
 </div>
 
 

@@ -1,8 +1,10 @@
 ---
 title: "Bayesian Cities Model 1D"
 author: "Dina Sinclair"
-date: "June 9, 2018"
-output: html_document
+date: '`r Sys.Date()`'
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r, warning = FALSE, message = FALSE}
@@ -33,10 +35,10 @@ C <- 2 # Number of pilots we can run
 D <- 2 # Number of cities we can implement the final program in
 I <- 3 # Number of studies (AKA number of cities)
 J <- 1 # Number of data points per study (Currently setting this to 1 for simplicity)
-num_hypothetical_draws <- 10 # Number of times you draw new pretend pilot study results
+num_hypothetical_draws <- 15 # Number of times you draw new pretend pilot study results
 
 # Generate theta and sigmaSq based off of mu, tau, I, J
-sigmaSq <- 100*runif(I) # For now, all sigma are ~U(0,1)
+sigmaSq <- 10*runif(I) # For now, all sigma are ~U(0,1)
 theta <- rnorm(I, mu, tauSq) # and theta ~N(mu,tauSq)
 sigmaSq <- matrix(sigmaSq, I , J)
 theta <- matrix(theta, I , J)
@@ -143,9 +145,9 @@ get_pilot_results <- function(K,Y){
   }
 }
 
-Y_P <- get_pilot_results(K,Y)
-print("updated Y")
-Y_P
+# Y_P <- get_pilot_results(K,Y)
+# print("updated Y")
+# Y_P
 ```
 
 
@@ -192,7 +194,7 @@ change_mind <- function(K,Y,original_rank){
 ```
 
 
-```{r}
+```{r, results="hide", warning = FALSE}
 original_rank <- order(Y$mu, decreasing=TRUE)
 original_rank
 combinations <-combn(seq(I),C)
