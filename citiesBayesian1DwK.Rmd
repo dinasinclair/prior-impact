@@ -28,6 +28,7 @@ Before we input data into the model, we need to set a few key constants. These a
 * *num_pilots*, the number of cities we can run a pilot program in
 * *num_final_cities*, the number of cities we can implement the final program in
 * *num_hypothetical_draws*, the number of times we'll simulate the results of each potential pilot choice
+* *Q*, the `quality' of the new pilot data (the factor by which the pilot data variance will differ from the original variance). A Q of 5 implies the pilot data has a variance that is 5 times smaller than the original study variance.
 
 
 ```{r}
@@ -35,7 +36,9 @@ Before we input data into the model, we need to set a few key constants. These a
 I <- 3 # Number of cities
 num_pilots <- 2 # Number of pilots
 num_final_cities <- 2 # Number of cities we can implement the final program in
-num_hypothetical_draws <- 15 # Number of times you simulate pilot study results
+num_hypothetical_draws <- 10 # Number of times you simulate pilot study results
+Q <- 5 # Pilot quality (variance multiplication factor)
+set.seed(17) # Ensure randomization is reproducible through a specified seed
 ```
 
 ### Inputs
@@ -47,25 +50,30 @@ For every city $i$, we need to know
 
 ##### Generating Example Inputs
 In this model, we will be assuming that
-$$Y \sim N(\mu, \tau^2)$$
-or is it that
-$$Y_i \sim N(\theta_i,\sigma^2_i) \text{ and } \theta_i \sim N(\mu,\tau^2)$$
-
+$$Y_i \sim N(\theta_i,\sigma^2_i)$$
+and
+$$\theta_i \sim N(\mu,\tau^2)$$
+To tell whether or not our model is accurately backing out $\mu$ and $\tau^2$, we can first pick a $\mu$ and $\tau^2$, generate input data based off of those constants, and then compare the resulting predicted $\mu$ and $\tau^2$ program results to the constants we originally selected.
 
 ```{r}
-# Set input parameters
-set.seed(17)
+# Set model hyperparameters for data generation
 mu <- 10
 tauSq <- 2
+```
 
-# Generate theta and sigmaSq based off of mu, tau, I
-sigmaSq <- 10*runif(I) # For now, all sigma are ~U(0,1)
-theta <- rnorm(I, mu, tauSq) # and theta ~N(mu,tauSq)
+To generate $\theta_i$, we then use the fact that $\theta_i \sim N(\mu, \tau^2)$ for all $i$. Since the $\sigma_i^2$ are independent of our choices of $\mu$ and $\tau^2$, we can use any $\sigma_i^2$ values we want for our generated input data. For simplicity, here we use values that are taken from U(0,1).
 
-# Calculate and reshape Y
-Y <- list(mu=theta, sd=sigmaSq)
+```{r}
+# Generate theta and sigmaSq
+theta <- rnorm(I, mean = mu, sd = sqrt(tauSq)) # with theta ~ N(mu,tauSq)
+sigmaSq <- 10*runif(I) # with sigmaSq ~ U(0,1)
+Y <- list(theta=theta, var=sigmaSq)
+```
 
-# Save our input data together in a list
+We can then reshape the data to a more convenient structure, where Y is a list containing all of the theta and sigmaSq values. The stan file also needs all of the data in a specific format, which we're creating here in the list basic_dat_generated.
+
+```{r}
+# Save our generated input data together in a list
 basic_dat_generated <- list(I=I,Y=theta,sigmaSq=sigmaSq)
 
 # Display what we've generated
@@ -75,53 +83,69 @@ basic_dat_generated
 
 ### Step 1: Calculate $\theta_i, \mu, \tau^2$ using the original priors Y
 
-We're assuming a **random effects model**, that is that $$\theta_i \sim N(\mu, \tau^2) \text{ and } Y_i \sim N(\theta_i, \sigma_{i}^2)$$
+We're assuming a **random effects model**, that is that 
+$$\theta_i \sim N(\mu, \tau^2)$$ 
+and
 
-To make use of this assumption, we need to estimate scalars $\mu$ and $\tau^2$ along with the vector $\theta = (\theta_1,\dots,\theta_N)$. We can do this using stan!
+$$Y_i \sim N(\theta_i, \sigma_{i}^2)$$
+
+To make use of this assumption, we need to estimate scalars $\mu$ and $\tau^2$ along with the vector $\theta = (\theta_1,\dots,\theta_I)$. We can do this using stan! The following code calls up the stan model *randomEffectsModel1D.stan*, a separate text file. This code will be run in stan, with the parameters
+
+* *iter*, the number of iterations TODO figure out better what this means
+* *chains*, the number of chains TODO ditto
 
 ```{r}
 fit <- stan(file = 'randomEffectsModel1D.stan', 
             data = basic_dat_generated, 
             iter = 1000, chains = 2)
+```
+
+Sure enough, we can see that stan did two main sets of iterations (chains) adn that each of those sets was 1000 iterations long. TODO look in more detail and link to a relevant explanation. (TODO also worth deciding - talk about the warning types here, divergent transitions and pairs() plot?)
+
+```{r}
 fit
 ```
+
+Looking at the data, we can see that our random effects model has generated a value for $\mu$, $\tau$ and $\theta$. This prediction uses the NUTS model (TODO insert link). We can now update our $\theta$ values to reflect the REM results.
+
 ```{r}
-# Readjust knowledge of Y based off of REM
+# Readjust knowledge of Y based on REM
 params <- extract(fit)
-for (i in 1:length(Y$mu)){
-  Y$mu[i] <- mean(params$theta[,i])
+for (i in 1:length(Y$theta)){
+  Y$theta[i] <- mean(params$theta[,i])
 }
-# TODO: Do we need to update the sd at all here post basic fit?
 Y
 ```
 
 
-### Step 2: Pick $K$ studies to pilot, calculate $Y^P_k$
+### Step 2: Pick a subset $K$ studies to pilot, calculate $Y^P_k$
 
 ##### Theoretically
 
-First, pick $K$ studies to update through new information. For these studies, we'll assume a **fixed effects model** and draw a new sample, imagining that this is a new study $Y^p_i$ done in the same place as study $Y_i$, so we can improve on our knowledge of $Y_i$. For now we will arbitrarily decide that $\sigma^P_{i} = \frac 1 5 \sigma_{i}$ (AKA that these new studies done will have a fifth of the error we were encountering in the first study). So for $i \in K$,
+First, pick a subset of cities $K$ to update through new pilot information. For these cities, we'll assume a **fixed effects model** and draw a new sample, imagining that for city $k in K$ this is a new study $Y^P_k$ done in the same place as study $Y_k$, so we can improve on our knowledge of $Y_k$. For now we will arbitrarily decide that $\sigma^P_k = \frac 1 Q \sigma_k$. So for $k\in K$,
 
-$$ Y^P_i \sim N(\theta_i, \frac 1 5 \sigma_{i})$$
-
-##### Concretely
-
-Here we're first going to go with the boring simple version where the subset K is just k=2. So we keep $Y_1$, $Y_3$ unchanged but need to make a $Y'_2$ using the generated $\theta_2$. We use an arbitrary 5x smaller sigma in $Y'_2$ than in $Y_2$ as noted in the norm above
+$$ Y^P_k \sim N(\theta_k, \frac 1 Q \sigma_k)$$
+To do this, we'll use the following function:
 ```{r}
-# Define set K of cities to try the pilot on and collect more data
-# K <- c(2)
-
-
-# for (k in K){
-#   print("Theta for new pilot:")
-#   print(Y$mu[k])
-#   new_draw <- rnorm( J , mean = Y$mu[k] , sd = (1/5)*Y$sd[k] )
-#   print("New Draw Results:")
-#   print(new_draw)
-# }
-
-
-
+# Calculate new data for all K new pilots
+get_pilot_results <- function(K,Y){
+  # Before update, Y_P is the same as Y
+  Y_P <- Y
+  
+  # Update for each new pilot k
+  for (k in K){
+    
+    # Gather New Pilot Data
+    new_sigmaSq <- Y$var[k] * (1/Q)
+    new_mean <- rnorm( 1 , mean = Y$theta[k] , sd = sqrt(new_sigmaSq ))
+    
+    # Combine the old and new data 
+    post_pilot <- update_Y(Y$theta[k],new_mean,Y$var[k],new_sigmaSq)
+    Y_P$theta[k] <- post_pilot$theta
+    Y_P$var[k] <- post_pilot$var
+    return(Y_P)
+  }
+}
 ```
 
 ### Step 3: Update all $Y$ values to get $Y'$
@@ -134,49 +158,23 @@ $$ \mu' = \frac{\mu_2 \sigma_1^2 + \sigma_2^2 \mu_1}{\sigma_2^2 + \sigma_1^2}$$
 and variance can be combined using
 $$\sigma' = \frac{\sigma_1^2 \sigma_2^2}{\sigma_1^2+\sigma_2^2} = \frac{1}{\frac{1}{\sigma_2^2}+\frac{1}{\sigma_1^2}}$$
 
-##### Concretely 
-
-Now that we have the generated new information $Y^P_k$, we need to combine it with the old information $Y_k$. We can do this by combining the means weighted by their standard deviations.
+Concretely, this code looks like
 
 ```{r}
 update_Y <- function(mu1, mu2, sigSq1, sigSq2){
   update_mu <- (mu1*sigSq2 + mu2*sigSq1)/(sigSq1 + sigSq2)
   update_sigSq <- (sigSq1*sigSq2)/(sigSq1 + sigSq2)
-  return(list(mu = update_mu, sd = update_sigSq))
+  return(list(theta = update_mu, var = update_sigSq))
 }
-
-# Calculate new data for all K new pilots
-get_pilot_results <- function(K,Y){
-  # Before update, Y_P is the same as Y
-  Y_P <- Y
-  
-  # Update for each new pilot k
-  for (k in K){
-    
-    # Gather New Pilot Data
-    new_sigmaSq <- Y$sd[k] * (1/5)
-    new_mean <- rnorm( 1 , mean = Y$mu[k] , sd = new_sigmaSq )
-    
-    # Combine the old and new data 
-    post_pilot <- update_Y(Y$mu[k],new_mean,Y$sd[k],new_sigmaSq)
-    Y_P$mu[k] <- post_pilot$mu
-    Y_P$sd[k] <- post_pilot$sd
-    return(Y_P)
-  }
-}
-
-# Y_P <- get_pilot_results(K,Y)
-# print("updated Y")
-# Y_P
 ```
 
 
 ### Step 4: Use $Y'$ to get final $\theta'$
 
-and once we have all the updated $Y'_i$ we can use them to get $\theta'_i$ based off of $\mu', \tau'^{2}$ with $Y' \sim N(\theta'_i, \sigma'_{i})$ 
+Once we have all the updated $Y'_i$ we can use them to get $\theta'_i$ based off of $\mu', \tau'^{2}$ with $Y' \sim N(\theta'_i, \sigma'_{i})$ 
 
 ```{r, eval = FALSE}
-updated_dat_generated <- list(I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+updated_dat_generated <- list(I, Y=Y_P$theta, sigmaSq=Y_P$var)
 fit_updated <- stan(file = 'randomEffectsModel1D.stan', 
             data = updated_dat_generated, 
             iter = 100, chains = 2, verbose = FALSE)
@@ -193,11 +191,11 @@ fit_updated
 new_ranking <- function(fit_updated,Y_P) {
   params_updated <- extract(fit_updated)
   Y_updated <- Y_P
-  for (i in 1:length(Y_updated$mu)){
-    Y_updated$mu[i] <- mean(params_updated$theta[,i])
+  for (i in 1:length(Y_updated$theta)){
+    Y_updated$theta[i] <- mean(params_updated$theta[,i])
     # TODO: do we update sigma as well??
   }
-  new_rank <- order(Y_updated$mu, decreasing=TRUE)
+  new_rank <- order(Y_updated$theta, decreasing=TRUE)
   return(new_rank)
 }
 ```
@@ -205,7 +203,7 @@ new_ranking <- function(fit_updated,Y_P) {
 ```{r}
 change_mind <- function(K,Y,original_rank){
   Y_P <- get_pilot_results(K,Y)
-  updated_dat_generated <- list(I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+  updated_dat_generated <- list(I, Y=Y_P$theta, sigmaSq=Y_P$var)
   fit_updated <- stan(file = 'randomEffectsModel1D.stan', 
                       data = updated_dat_generated, 
                       iter = 1000, chains = 2)
@@ -217,7 +215,7 @@ change_mind <- function(K,Y,original_rank){
 
 
 ```{r, results="hide", warning = FALSE}
-original_rank <- order(Y$mu, decreasing=TRUE)
+original_rank <- order(Y$theta, decreasing=TRUE)
 original_rank
 combinations <-combn(seq(I),num_pilots)
 nmc <- numeric(I)

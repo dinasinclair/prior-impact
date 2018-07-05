@@ -142,12 +142,15 @@ $(document).ready(function () {
 <li><em>num_pilots</em>, the number of cities we can run a pilot program in</li>
 <li><em>num_final_cities</em>, the number of cities we can implement the final program in</li>
 <li><em>num_hypothetical_draws</em>, the number of times we’ll simulate the results of each potential pilot choice</li>
+<li><em>Q</em>, the `quality’ of the new pilot data (the factor by which the pilot data variance will differ from the original variance). A Q of 5 implies the pilot data has a variance that is 5 times smaller than the original study variance.</li>
 </ul>
 <pre class="r"><code># Set general constants
 I &lt;- 3 # Number of cities
 num_pilots &lt;- 2 # Number of pilots
 num_final_cities &lt;- 2 # Number of cities we can implement the final program in
-num_hypothetical_draws &lt;- 15 # Number of times you simulate pilot study results</code></pre>
+num_hypothetical_draws &lt;- 10 # Number of times you simulate pilot study results
+Q &lt;- 5 # Pilot quality (variance multiplication factor)
+set.seed(17) # Ensure randomization is reproducible through a specified seed</code></pre>
 </div>
 <div id="inputs" class="section level3">
 <h3>Inputs</h3>
@@ -158,20 +161,17 @@ num_hypothetical_draws &lt;- 15 # Number of times you simulate pilot study resul
 </ul>
 <div id="generating-example-inputs" class="section level5">
 <h5>Generating Example Inputs</h5>
-<p>In this model, we will be assuming that <span class="math display">\[Y \sim N(\mu, \tau^2)\]</span> or is it that <span class="math display">\[Y_i \sim N(\theta_i,\sigma^2_i) \text{ and } \theta_i \sim N(\mu,\tau^2)\]</span></p>
-<pre class="r"><code># Set input parameters
-set.seed(17)
+<p>In this model, we will be assuming that <span class="math display">\[Y_i \sim N(\theta_i,\sigma^2_i)\]</span> and <span class="math display">\[\theta_i \sim N(\mu,\tau^2)\]</span> To tell whether or not our model is accurately backing out <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span>, we can first pick a <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span>, generate input data based off of those constants, and then compare the resulting predicted <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span> program results to the constants we originally selected.</p>
+<pre class="r"><code># Set model hyperparameters for data generation
 mu &lt;- 10
-tauSq &lt;- 2
-
-# Generate theta and sigmaSq based off of mu, tau, I
-sigmaSq &lt;- 10*runif(I) # For now, all sigma are ~U(0,1)
-theta &lt;- rnorm(I, mu, tauSq) # and theta ~N(mu,tauSq)
-
-# Calculate and reshape Y
-Y &lt;- list(mu=theta, sd=sigmaSq)
-
-# Save our input data together in a list
+tauSq &lt;- 2</code></pre>
+<p>To generate <span class="math inline">\(\theta_i\)</span>, we then use the fact that <span class="math inline">\(\theta_i \sim N(\mu, \tau^2)\)</span> for all <span class="math inline">\(i\)</span>. Since the <span class="math inline">\(\sigma_i^2\)</span> are independent of our choices of <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span>, we can use any <span class="math inline">\(\sigma_i^2\)</span> values we want for our generated input data. For simplicity, here we use values that are taken from U(0,1).</p>
+<pre class="r"><code># Generate theta and sigmaSq
+theta &lt;- rnorm(I, mean = mu, sd = sqrt(tauSq)) # with theta ~ N(mu,tauSq)
+sigmaSq &lt;- 10*runif(I) # with sigmaSq ~ U(0,1)
+Y &lt;- list(theta=theta, var=sigmaSq)</code></pre>
+<p>We can then reshape the data to a more convenient structure, where Y is a list containing all of the theta and sigmaSq values. The stan file also needs all of the data in a specific format, which we’re creating here in the list basic_dat_generated.</p>
+<pre class="r"><code># Save our generated input data together in a list
 basic_dat_generated &lt;- list(I=I,Y=theta,sigmaSq=sigmaSq)
 
 # Display what we've generated
@@ -180,16 +180,21 @@ basic_dat_generated</code></pre>
 ## [1] 3
 ## 
 ## $Y
-## [1] 11.522993 10.194808  8.222759
+## [1] 8.564561 9.887377 9.670507
 ## 
 ## $sigmaSq
-## [1] 1.550508 9.683788 4.682631</code></pre>
+## [1] 2.068877 1.871036 7.799697</code></pre>
 </div>
 </div>
 <div id="step-1-calculate-theta_i-mu-tau2-using-the-original-priors-y" class="section level3">
 <h3>Step 1: Calculate <span class="math inline">\(\theta_i, \mu, \tau^2\)</span> using the original priors Y</h3>
-<p>We’re assuming a <strong>random effects model</strong>, that is that <span class="math display">\[\theta_i \sim N(\mu, \tau^2) \text{ and } Y_i \sim N(\theta_i, \sigma_{i}^2)\]</span></p>
-<p>To make use of this assumption, we need to estimate scalars <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span> along with the vector <span class="math inline">\(\theta = (\theta_1,\dots,\theta_N)\)</span>. We can do this using stan!</p>
+<p>We’re assuming a <strong>random effects model</strong>, that is that <span class="math display">\[\theta_i \sim N(\mu, \tau^2)\]</span> and</p>
+<p><span class="math display">\[Y_i \sim N(\theta_i, \sigma_{i}^2)\]</span></p>
+<p>To make use of this assumption, we need to estimate scalars <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\tau^2\)</span> along with the vector <span class="math inline">\(\theta = (\theta_1,\dots,\theta_I)\)</span>. We can do this using stan! The following code calls up the stan model <em>randomEffectsModel1D.stan</em>, a separate text file. This code will be run in stan, with the parameters</p>
+<ul>
+<li><em>iter</em>, the number of iterations TODO figure out better what this means</li>
+<li><em>chains</em>, the number of chains TODO ditto</li>
+</ul>
 <pre class="r"><code>fit &lt;- stan(file = 'randomEffectsModel1D.stan', 
             data = basic_dat_generated, 
             iter = 1000, chains = 2)</code></pre>
@@ -201,7 +206,7 @@ basic_dat_generated</code></pre>
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
-##                  from file166859f45ad4.cpp:8:
+##                  from file8ff4602d723c.cpp:8:
 ## C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: &quot;BOOST_NO_CXX11_RVALUE_REFERENCES&quot; redefined
 ##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
 ##  ^
@@ -227,9 +232,9 @@ basic_dat_generated</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.04 seconds (Warm-up)
-##                0.034 seconds (Sampling)
-##                0.074 seconds (Total)
+##  Elapsed Time: 0.035 seconds (Warm-up)
+##                0.035 seconds (Sampling)
+##                0.07 seconds (Total)
 ## 
 ## 
 ## SAMPLING FOR MODEL 'randomEffectsModel1D' NOW (CHAIN 2).
@@ -252,79 +257,50 @@ basic_dat_generated</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.046 seconds (Warm-up)
-##                0.045 seconds (Sampling)
-##                0.091 seconds (Total)</code></pre>
-<pre><code>## Warning: There were 74 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. See
+##  Elapsed Time: 0.032 seconds (Warm-up)
+##                0.033 seconds (Sampling)
+##                0.065 seconds (Total)</code></pre>
+<pre><code>## Warning: There were 43 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. See
 ## http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</code></pre>
 <pre><code>## Warning: Examine the pairs() plot to diagnose sampling problems</code></pre>
+<p>Sure enough, we can see that stan did two main sets of iterations (chains) adn that each of those sets was 1000 iterations long. TODO look in more detail and link to a relevant explanation. (TODO also worth deciding - talk about the warning types here, divergent transitions and pairs() plot?)</p>
 <pre class="r"><code>fit</code></pre>
 <pre><code>## Inference for Stan model: randomEffectsModel1D.
 ## 2 chains, each with iter=1000; warmup=500; thin=1; 
 ## post-warmup draws per chain=500, total post-warmup draws=1000.
 ## 
-##            mean se_mean   sd   2.5%    25%    50%    75% 97.5% n_eff Rhat
-## mu        10.51    0.26 6.54  -2.71   8.76  10.49  12.66 25.63   638 1.00
-## tau        2.22    0.13 1.46   0.76   1.22   1.75   2.76  6.02   137 1.00
-## theta[1]  11.18    0.12 1.52   8.17  10.11  11.02  12.23 14.20   168 1.00
-## theta[2]  10.56    0.26 5.05  -0.65   8.15  10.50  13.01 20.91   379 1.00
-## theta[3]   9.68    0.24 3.64   1.35   8.09   9.83  11.98 16.21   222 1.02
-## lp__     -15.06    0.34 3.15 -21.25 -17.31 -14.71 -12.66 -9.28    85 1.01
+##            mean se_mean    sd   2.5%    25%    50%    75% 97.5% n_eff Rhat
+## mu        11.94    1.92 13.91   1.24   7.87   9.54  11.14 55.84    52 1.06
+## tau        2.24    0.27  2.01   0.72   1.12   1.70   2.59  8.31    56 1.05
+## theta[1]   8.88    0.11  1.86   5.03   7.69   8.95  10.08 12.36   309 1.00
+## theta[2]   9.81    0.09  1.64   6.63   8.74   9.82  10.84 12.98   355 1.00
+## theta[3]   8.95    0.19  4.21   0.18   6.86   9.06  11.21 18.21   477 1.00
+## lp__     -13.94    0.44  3.38 -21.94 -15.89 -13.47 -11.53 -8.88    58 1.04
 ## 
-## Samples were drawn using NUTS(diag_e) at Thu Jul 05 15:52:41 2018.
+## Samples were drawn using NUTS(diag_e) at Thu Jul 05 18:25:03 2018.
 ## For each parameter, n_eff is a crude measure of effective sample size,
 ## and Rhat is the potential scale reduction factor on split chains (at 
 ## convergence, Rhat=1).</code></pre>
-<pre class="r"><code># Readjust knowledge of Y based off of REM
+<p>Looking at the data, we can see that our random effects model has generated a value for <span class="math inline">\(\mu\)</span>, <span class="math inline">\(\tau\)</span> and <span class="math inline">\(\theta\)</span>. This prediction uses the NUTS model (TODO insert link). We can now update our <span class="math inline">\(\theta\)</span> values to reflect the REM results.</p>
+<pre class="r"><code># Readjust knowledge of Y based on REM
 params &lt;- extract(fit)
-for (i in 1:length(Y$mu)){
-  Y$mu[i] &lt;- mean(params$theta[,i])
+for (i in 1:length(Y$theta)){
+  Y$theta[i] &lt;- mean(params$theta[,i])
 }
-# TODO: Do we need to update the sd at all here post basic fit?
 Y</code></pre>
-<pre><code>## $mu
-## [1] 11.176597 10.555695  9.676882
+<pre><code>## $theta
+## [1] 8.877135 9.808366 8.954317
 ## 
-## $sd
-## [1] 1.550508 9.683788 4.682631</code></pre>
+## $var
+## [1] 2.068877 1.871036 7.799697</code></pre>
 </div>
-<div id="step-2-pick-k-studies-to-pilot-calculate-yp_k" class="section level3">
-<h3>Step 2: Pick <span class="math inline">\(K\)</span> studies to pilot, calculate <span class="math inline">\(Y^P_k\)</span></h3>
+<div id="step-2-pick-a-subset-k-studies-to-pilot-calculate-yp_k" class="section level3">
+<h3>Step 2: Pick a subset <span class="math inline">\(K\)</span> studies to pilot, calculate <span class="math inline">\(Y^P_k\)</span></h3>
 <div id="theoretically" class="section level5">
 <h5>Theoretically</h5>
-<p>First, pick <span class="math inline">\(K\)</span> studies to update through new information. For these studies, we’ll assume a <strong>fixed effects model</strong> and draw a new sample, imagining that this is a new study <span class="math inline">\(Y^p_i\)</span> done in the same place as study <span class="math inline">\(Y_i\)</span>, so we can improve on our knowledge of <span class="math inline">\(Y_i\)</span>. For now we will arbitrarily decide that <span class="math inline">\(\sigma^P_{i} = \frac 1 5 \sigma_{i}\)</span> (AKA that these new studies done will have a fifth of the error we were encountering in the first study). So for <span class="math inline">\(i \in K\)</span>,</p>
-<p><span class="math display">\[ Y^P_i \sim N(\theta_i, \frac 1 5 \sigma_{i})\]</span></p>
-</div>
-<div id="concretely" class="section level5">
-<h5>Concretely</h5>
-<p>Here we’re first going to go with the boring simple version where the subset K is just k=2. So we keep <span class="math inline">\(Y_1\)</span>, <span class="math inline">\(Y_3\)</span> unchanged but need to make a <span class="math inline">\(Y'_2\)</span> using the generated <span class="math inline">\(\theta_2\)</span>. We use an arbitrary 5x smaller sigma in <span class="math inline">\(Y'_2\)</span> than in <span class="math inline">\(Y_2\)</span> as noted in the norm above</p>
-<pre class="r"><code># Define set K of cities to try the pilot on and collect more data
-# K &lt;- c(2)
-
-
-# for (k in K){
-#   print(&quot;Theta for new pilot:&quot;)
-#   print(Y$mu[k])
-#   new_draw &lt;- rnorm( J , mean = Y$mu[k] , sd = (1/5)*Y$sd[k] )
-#   print(&quot;New Draw Results:&quot;)
-#   print(new_draw)
-# }</code></pre>
-</div>
-</div>
-<div id="step-3-update-all-y-values-to-get-y" class="section level3">
-<h3>Step 3: Update all <span class="math inline">\(Y\)</span> values to get <span class="math inline">\(Y'\)</span></h3>
-<p>Once those <span class="math inline">\(k\)</span> new values get calculated, update by combining to get <span class="math display">\[update(Y_k, Y^P_k) = Y'_k\]</span></p>
-<p>This draws on the idea that the mean can be combined with the equation <span class="math display">\[ \mu' = \frac{\mu_2 \sigma_1^2 + \sigma_2^2 \mu_1}{\sigma_2^2 + \sigma_1^2}\]</span> and variance can be combined using <span class="math display">\[\sigma' = \frac{\sigma_1^2 \sigma_2^2}{\sigma_1^2+\sigma_2^2} = \frac{1}{\frac{1}{\sigma_2^2}+\frac{1}{\sigma_1^2}}\]</span></p>
-<div id="concretely-1" class="section level5">
-<h5>Concretely</h5>
-<p>Now that we have the generated new information <span class="math inline">\(Y^P_k\)</span>, we need to combine it with the old information <span class="math inline">\(Y_k\)</span>. We can do this by combining the means weighted by their standard deviations.</p>
-<pre class="r"><code>update_Y &lt;- function(mu1, mu2, sigSq1, sigSq2){
-  update_mu &lt;- (mu1*sigSq2 + mu2*sigSq1)/(sigSq1 + sigSq2)
-  update_sigSq &lt;- (sigSq1*sigSq2)/(sigSq1 + sigSq2)
-  return(list(mu = update_mu, sd = update_sigSq))
-}
-
-# Calculate new data for all K new pilots
+<p>First, pick a subset of cities <span class="math inline">\(K\)</span> to update through new pilot information. For these cities, we’ll assume a <strong>fixed effects model</strong> and draw a new sample, imagining that for city <span class="math inline">\(k in K\)</span> this is a new study <span class="math inline">\(Y^P_k\)</span> done in the same place as study <span class="math inline">\(Y_k\)</span>, so we can improve on our knowledge of <span class="math inline">\(Y_k\)</span>. For now we will arbitrarily decide that <span class="math inline">\(\sigma^P_k = \frac 1 Q \sigma_k\)</span>. So for <span class="math inline">\(k\in K\)</span>,</p>
+<p><span class="math display">\[ Y^P_k \sim N(\theta_k, \frac 1 Q \sigma_k)\]</span> To do this, we’ll use the following function:</p>
+<pre class="r"><code># Calculate new data for all K new pilots
 get_pilot_results &lt;- function(K,Y){
   # Before update, Y_P is the same as Y
   Y_P &lt;- Y
@@ -333,26 +309,33 @@ get_pilot_results &lt;- function(K,Y){
   for (k in K){
     
     # Gather New Pilot Data
-    new_sigmaSq &lt;- Y$sd[k] * (1/5)
-    new_mean &lt;- rnorm( 1 , mean = Y$mu[k] , sd = new_sigmaSq )
+    new_sigmaSq &lt;- Y$var[k] * (1/Q)
+    new_mean &lt;- rnorm( 1 , mean = Y$theta[k] , sd = sqrt(new_sigmaSq ))
     
     # Combine the old and new data 
-    post_pilot &lt;- update_Y(Y$mu[k],new_mean,Y$sd[k],new_sigmaSq)
-    Y_P$mu[k] &lt;- post_pilot$mu
-    Y_P$sd[k] &lt;- post_pilot$sd
+    post_pilot &lt;- update_Y(Y$theta[k],new_mean,Y$var[k],new_sigmaSq)
+    Y_P$theta[k] &lt;- post_pilot$theta
+    Y_P$var[k] &lt;- post_pilot$var
     return(Y_P)
   }
-}
-
-# Y_P &lt;- get_pilot_results(K,Y)
-# print(&quot;updated Y&quot;)
-# Y_P</code></pre>
+}</code></pre>
 </div>
+</div>
+<div id="step-3-update-all-y-values-to-get-y" class="section level3">
+<h3>Step 3: Update all <span class="math inline">\(Y\)</span> values to get <span class="math inline">\(Y'\)</span></h3>
+<p>Once those <span class="math inline">\(k\)</span> new values get calculated, update by combining to get <span class="math display">\[update(Y_k, Y^P_k) = Y'_k\]</span></p>
+<p>This draws on the idea that the mean can be combined with the equation <span class="math display">\[ \mu' = \frac{\mu_2 \sigma_1^2 + \sigma_2^2 \mu_1}{\sigma_2^2 + \sigma_1^2}\]</span> and variance can be combined using <span class="math display">\[\sigma' = \frac{\sigma_1^2 \sigma_2^2}{\sigma_1^2+\sigma_2^2} = \frac{1}{\frac{1}{\sigma_2^2}+\frac{1}{\sigma_1^2}}\]</span></p>
+<p>Concretely, this code looks like</p>
+<pre class="r"><code>update_Y &lt;- function(mu1, mu2, sigSq1, sigSq2){
+  update_mu &lt;- (mu1*sigSq2 + mu2*sigSq1)/(sigSq1 + sigSq2)
+  update_sigSq &lt;- (sigSq1*sigSq2)/(sigSq1 + sigSq2)
+  return(list(theta = update_mu, var = update_sigSq))
+}</code></pre>
 </div>
 <div id="step-4-use-y-to-get-final-theta" class="section level3">
 <h3>Step 4: Use <span class="math inline">\(Y'\)</span> to get final <span class="math inline">\(\theta'\)</span></h3>
-<p>and once we have all the updated <span class="math inline">\(Y'_i\)</span> we can use them to get <span class="math inline">\(\theta'_i\)</span> based off of <span class="math inline">\(\mu', \tau'^{2}\)</span> with <span class="math inline">\(Y' \sim N(\theta'_i, \sigma'_{i})\)</span></p>
-<pre class="r"><code>updated_dat_generated &lt;- list(I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+<p>Once we have all the updated <span class="math inline">\(Y'_i\)</span> we can use them to get <span class="math inline">\(\theta'_i\)</span> based off of <span class="math inline">\(\mu', \tau'^{2}\)</span> with <span class="math inline">\(Y' \sim N(\theta'_i, \sigma'_{i})\)</span></p>
+<pre class="r"><code>updated_dat_generated &lt;- list(I, Y=Y_P$theta, sigmaSq=Y_P$var)
 fit_updated &lt;- stan(file = 'randomEffectsModel1D.stan', 
             data = updated_dat_generated, 
             iter = 100, chains = 2, verbose = FALSE)
@@ -361,16 +344,16 @@ fit_updated</code></pre>
 <pre class="r"><code>new_ranking &lt;- function(fit_updated,Y_P) {
   params_updated &lt;- extract(fit_updated)
   Y_updated &lt;- Y_P
-  for (i in 1:length(Y_updated$mu)){
-    Y_updated$mu[i] &lt;- mean(params_updated$theta[,i])
+  for (i in 1:length(Y_updated$theta)){
+    Y_updated$theta[i] &lt;- mean(params_updated$theta[,i])
     # TODO: do we update sigma as well??
   }
-  new_rank &lt;- order(Y_updated$mu, decreasing=TRUE)
+  new_rank &lt;- order(Y_updated$theta, decreasing=TRUE)
   return(new_rank)
 }</code></pre>
 <pre class="r"><code>change_mind &lt;- function(K,Y,original_rank){
   Y_P &lt;- get_pilot_results(K,Y)
-  updated_dat_generated &lt;- list(I, Y=Y_P$mu, sigmaSq=Y_P$sd)
+  updated_dat_generated &lt;- list(I, Y=Y_P$theta, sigmaSq=Y_P$var)
   fit_updated &lt;- stan(file = 'randomEffectsModel1D.stan', 
                       data = updated_dat_generated, 
                       iter = 1000, chains = 2)
@@ -378,7 +361,7 @@ fit_updated</code></pre>
   print(new_rank)
   return(!setequal(original_rank[1:num_final_cities],new_rank[1:num_final_cities]))
 }</code></pre>
-<pre class="r"><code>original_rank &lt;- order(Y$mu, decreasing=TRUE)
+<pre class="r"><code>original_rank &lt;- order(Y$theta, decreasing=TRUE)
 original_rank
 combinations &lt;-combn(seq(I),num_pilots)
 nmc &lt;- numeric(I)
@@ -392,21 +375,21 @@ nmc</code></pre>
 <p>Brief summary of the results</p>
 <pre class="r"><code># So what are these results exactly?
 print(Y)</code></pre>
-<pre><code>## $mu
-## [1] 11.176597 10.555695  9.676882
+<pre><code>## $theta
+## [1] 8.877135 9.808366 8.954317
 ## 
-## $sd
-## [1] 1.550508 9.683788 4.682631</code></pre>
+## $var
+## [1] 2.068877 1.871036 7.799697</code></pre>
 <pre class="r"><code>for (i in 1:length(nmc)){
   print(combinations[,i])
   print(paste(&quot;Number of times minds changed: &quot;,nmc[i],&quot;/&quot;,num_hypothetical_draws))
 } </code></pre>
 <pre><code>## [1] 1 2
-## [1] &quot;Number of times minds changed:  1 / 15&quot;
+## [1] &quot;Number of times minds changed:  4 / 10&quot;
 ## [1] 1 3
-## [1] &quot;Number of times minds changed:  0 / 15&quot;
+## [1] &quot;Number of times minds changed:  1 / 10&quot;
 ## [1] 2 3
-## [1] &quot;Number of times minds changed:  7 / 15&quot;</code></pre>
+## [1] &quot;Number of times minds changed:  1 / 10&quot;</code></pre>
 </div>
 
 
