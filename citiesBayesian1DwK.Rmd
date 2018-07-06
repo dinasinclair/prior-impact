@@ -67,14 +67,14 @@ To generate $\theta_i$, we then use the fact that $\theta_i \sim N(\mu, \tau^2)$
 # Generate theta and sigmaSq
 theta <- rnorm(I, mean = mu, sd = sqrt(tauSq)) # with theta ~ N(mu,tauSq)
 sigmaSq <- 10*runif(I) # with sigmaSq ~ U(0,1)
-Y <- list(theta=theta, var=sigmaSq)
+Y <- list(mean=theta, var=sigmaSq)
 ```
 
 We can then reshape the data to a more convenient structure, where Y is a list containing all of the theta and sigmaSq values. The stan file also needs all of the data in a specific format, which we're creating here in the list basic_dat_generated.
 
 ```{r}
 # Save our generated input data together in a list
-basic_dat_generated <- list(I=I,Y=theta,sigmaSq=sigmaSq)
+basic_dat_generated <- list(I=I,Y=Y$mean,sigmaSq=Y$sigmaSq)
 
 # Display what we've generated
 basic_dat_generated
@@ -111,8 +111,8 @@ Looking at the data, we can see that our random effects model has generated a va
 ```{r}
 # Readjust knowledge of Y based on REM
 params <- extract(fit)
-for (i in 1:length(Y$theta)){
-  Y$theta[i] <- mean(params$theta[,i])
+for (i in 1:length(Y$mean)){
+  Y$mean[i] <- mean(params$theta[,i])
 }
 Y
 ```
@@ -120,9 +120,7 @@ Y
 
 ### Step 2: Pick a subset $K$ studies to pilot, calculate $Y^P_k$
 
-##### Theoretically
-
-First, pick a subset of cities $K$ to update through new pilot information. For these cities, we'll assume a **fixed effects model** and draw a new sample, imagining that for city $k in K$ this is a new study $Y^P_k$ done in the same place as study $Y_k$, so we can improve on our knowledge of $Y_k$. For now we will arbitrarily decide that $\sigma^P_k = \frac 1 Q \sigma_k$. So for $k\in K$,
+First, pick a subset of cities $K$ to update through new pilot information. For these cities, we'll assume a **fixed effects model** and draw a new sample, imagining that for city $k \in K$ this is a new study $Y^P_k$ done in the same place as study $Y_k$, so we can improve on our knowledge of $Y_k$. For now we will arbitrarily decide that $\sigma^P_k = \frac 1 Q \sigma_k$. So for $k\in K$,
 
 $$ Y^P_k \sim N(\theta_k, \frac 1 Q \sigma_k)$$
 To do this, we'll use the following function:
@@ -137,11 +135,11 @@ get_pilot_results <- function(K,Y){
     
     # Gather New Pilot Data
     new_sigmaSq <- Y$var[k] * (1/Q)
-    new_mean <- rnorm( 1 , mean = Y$theta[k] , sd = sqrt(new_sigmaSq ))
+    new_mean <- rnorm( 1 , mean = Y$mean[k] , sd = sqrt(new_sigmaSq ))
     
     # Combine the old and new data 
-    post_pilot <- update_Y(Y$theta[k],new_mean,Y$var[k],new_sigmaSq)
-    Y_P$theta[k] <- post_pilot$theta
+    post_pilot <- update_Y(Y$mean[k],new_mean,Y$var[k],new_sigmaSq)
+    Y_P$mean[k] <- post_pilot$mean
     Y_P$var[k] <- post_pilot$var
     return(Y_P)
   }
@@ -153,25 +151,29 @@ get_pilot_results <- function(K,Y){
 Once those $k$ new values get calculated, update by combining to get 
 $$update(Y_k, Y^P_k) = Y'_k$$
 
-This draws on the idea that the mean can be combined with the equation
-$$ \mu' = \frac{\mu_2 \sigma_1^2 + \sigma_2^2 \mu_1}{\sigma_2^2 + \sigma_1^2}$$
-and variance can be combined using
-$$\sigma' = \frac{\sigma_1^2 \sigma_2^2}{\sigma_1^2+\sigma_2^2} = \frac{1}{\frac{1}{\sigma_2^2}+\frac{1}{\sigma_1^2}}$$
+This draws on the idea that given normal distributions $Y_1 \sim N(\mu_1, \sigma^2_1)$ and $Y_2 \sim N(\mu_2, \sigma^2_2)$, the two distributions can be combined to get $Y'$ with mean $\mu'$ and variance $\sigma^{2'}$ using the equations
+$$ \mu'= \frac{\mu _2 \sigma_1^2 + \sigma_2^2 \mu _1}{\sigma_2^2 + \sigma_1^2}$$
+and 
+$$\sigma^{2'}= \frac{\sigma_1^2 \sigma_2^2}{\sigma_1^2+\sigma_2^2} = \frac{1}{\frac{1}{\sigma_2^2}+\frac{1}{\sigma_1^2}}$$
 
 Concretely, this code looks like
 
 ```{r}
 update_Y <- function(mu1, mu2, sigSq1, sigSq2){
-  update_mu <- (mu1*sigSq2 + mu2*sigSq1)/(sigSq1 + sigSq2)
-  update_sigSq <- (sigSq1*sigSq2)/(sigSq1 + sigSq2)
-  return(list(theta = update_mu, var = update_sigSq))
+  update_mean  <- (mu1*sigSq2 + mu2*sigSq1)/(sigSq1 + sigSq2)
+  update_var <- (sigSq1*sigSq2)/(sigSq1 + sigSq2)
+  return(list(mean = update_mean , var = update_var))
 }
 ```
 
 
 ### Step 4: Use $Y'$ to get final $\theta'$
 
-Once we have all the updated $Y'_i$ we can use them to get $\theta'_i$ based off of $\mu', \tau'^{2}$ with $Y' \sim N(\theta'_i, \sigma'_{i})$, using the same randomEffectsModel1D.stan file as before. We can extract that fit as fit_updated, and use it to get the needed $\theta'$.
+Once we have all the updated $Y'_i$ we can use them to get $\theta'_i$ using the random effects model relationship 
+$$Y' \sim N(\theta'_i, \sigma'_{i}),$$
+with 
+$$\theta' \sim N(\mu',\tau^{2'}).$$
+Using the same randomEffectsModel1D.stan file as before, we can extract that fit as fit_updated, and use it to get the needed $\theta'$.
 
 Once we update $\theta$ to $\theta'$, we can look at the ranking of this end result - with our new knowledge, which cities do the best? Using the order function, we can rank the cities from best (highest value for $\theta'$) to worst (lowest value for $\theta'$). The new ranking is returned in the function below.
 
@@ -179,57 +181,71 @@ Once we update $\theta$ to $\theta'$, we can look at the ranking of this end res
 new_ranking <- function(fit_updated,Y_P) {
   params_updated <- extract(fit_updated)
   Y_updated <- Y_P
-  for (i in 1:length(Y_updated$theta)){
-    Y_updated$theta[i] <- mean(params_updated$theta[,i])
+  for (i in 1:length(Y_updated$mean)){
+    Y_updated$mean[i] <- mean(params_updated$theta[,i])
   }
-  new_rank <- order(Y_updated$theta, decreasing=TRUE)
+  new_rank <- order(Y_updated$mean, decreasing=TRUE)
   return(new_rank)
 }
 ```
 
-Once we have this ranking, we next need to ask - did the information from the pilots add value? In this case, we're choosing to define the pilot information as valuable if the act of running the pilot studies changes which subset of cities we select for the final program implementation. 
+From this ranking, we next need to ask - did the information from the pilots add value? Here, we choose to define the pilot information as valuable if the act of running the pilot studies changes which subset of cities we select for the final program implementation. 
 
-In other words, we are looking at if the pilots *change our mind*. This happens when the cities that have the highest num_final values of $\theta'$ are different than the cities that originally had the highest num_final values of our initial $\theta$ priors.
+In other words, we are looking at if the pilots *change our mind*. Let the number of cities that we can run the final program in be $F$. Then we 'change our mind' if the cities with the highest $F$ values of $\theta'$ (the cities we'd choose after the pilots) are different than the cities that had the highest $F$ values of $\theta$ (the cities we'd have chosen before the pilots).
 
-This function returns a boolean denoting if for a given subset of cities $K$ to run pilots in, we will change our mind as a result. Note that this relies on whatever draws happen in this specific instance of the pilot simulation, so for each given subset of cities $K$, there is some probability that 
+The function *change_mind* below returns a boolean denoting if we will change our mind as a result of running pilots in subset of cities $K$. Note that this relies on the randomly generated results of the pilot studies, so sometimes a given subset of $K$ city pilots might change our minds while other times it might not. 
+
 ```{r}
 change_mind <- function(K,Y,original_rank){
+  # This function returns TRUE if the pilots run in K change the final actions
+  # and returns FALSE otherwise, given original ranking and data Y.
+  
+  # Simulate pilots
   Y_P <- get_pilot_results(K,Y)
-  updated_dat_generated <- list(I, Y=Y_P$theta, sigmaSq=Y_P$var)
+  # Update thetas
+  updated_dat_generated <- list(I, Y=Y_P$mean, sigmaSq=Y_P$var)
   fit_updated <- stan(file = 'randomEffectsModel1D.stan', 
                       data = updated_dat_generated, 
                       iter = 1000, chains = 2)
+  # Use new thetas to get a new city ranking
   new_rank <- new_ranking(fit_updated,Y_P) 
-  print(new_rank)
-  return(!setequal(original_rank[1:num_final_cities],new_rank[1:num_final_cities]))
+  # Take the top F cities from each ranking as final city choice
+  original_choice <- original_rank[1:num_final_cities]
+  new_choice <- new_rank[1:num_final_cities]
+  # Return the setequality of the two rankings (set bc order doesn't matter)
+  return(!setequal(original_choice,new_choice))
 }
 ```
 
+Since the *change_mind* function returns a probabilistically generated result, we need to run the function many times to get a sense of how likely a given choice of cities $K$ will change our minds. Therefore, for each possible subset of cities $K$, we run the *change_mind* function *num_hypothetical_draws* times, summing up the total number of times our minds are changed.
 
+The code for this final step is below
 ```{r, results="hide", warning = FALSE}
-original_rank <- order(Y$theta, decreasing=TRUE)
+# Calculate the city ranking of the original data
+original_rank <- order(Y$mean, decreasing=TRUE)
 original_rank
+
+# Generate all combinations of cities $K$, store them in vector 'combinations'
 combinations <-combn(seq(I),num_pilots)
+# Initiate number of minds changed (nmc) to zero
 nmc <- numeric(I)
+
+# Loop through all combinations K, updating nmc num_hypothetical_draws times
 for (i in 1:ncol(combinations)){
   for (j in 1:num_hypothetical_draws){
     K <- combinations[,i]
     nmc[i] <- nmc[i] + change_mind(K,Y,original_rank)
   }
 } 
-nmc
 ```
 
-
-Brief summary of the results
+So what are the results? We print them here.
 ```{r}
-# So what are these results exactly?
 print(Y)
 for (i in 1:length(nmc)){
   print(combinations[,i])
   print(paste("Number of times minds changed: ",nmc[i],"/",num_hypothetical_draws))
 } 
-
 ```
 
 
