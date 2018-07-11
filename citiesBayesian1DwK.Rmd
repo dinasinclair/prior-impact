@@ -3,8 +3,8 @@ title: "Bayesian Cities Model 1D"
 author: "Dina Sinclair"
 date: '`r Sys.Date()`'
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 ### Overview
 
@@ -91,8 +91,8 @@ $$Y_i \sim N(\theta_i, \sigma_{i}^2)$$
 
 To make use of this assumption, we need to estimate scalars $\mu$ and $\tau^2$ along with the vector $\theta = (\theta_1,\dots,\theta_I)$. We can do this using stan! The following code calls up the stan model *randomEffectsModel1D.stan*, a separate text file. This code will be run in stan, with the parameters
 
-* *iter*, the number of iterations TODO figure out better what this means
-* *chains*, the number of chains TODO ditto
+* *iter*, the number of iterations of each chain (default is 2000)
+* *chains*, the number of markov chains (default is 4)
 
 ```{r}
 fit <- stan(file = 'randomEffectsModel1D.stan', 
@@ -100,13 +100,15 @@ fit <- stan(file = 'randomEffectsModel1D.stan',
             iter = 1000, chains = 2)
 ```
 
-Sure enough, we can see that stan did two main sets of iterations (chains) adn that each of those sets was 1000 iterations long. TODO look in more detail and link to a relevant explanation. (TODO also worth deciding - talk about the warning types here, divergent transitions and pairs() plot?)
+Sure enough, we can see that stan did two main sets of iterations (chains) adn that each of those sets was 1000 iterations long. For more details read the [Stan Modeling Language User's Guide and Reference Manual](http://mc-stan.org/users/documentation/index.html) section 34.
 
 ```{r}
 fit
 ```
 
-Looking at the data, we can see that our random effects model has generated a value for $\mu$, $\tau$ and $\theta$. This prediction uses the NUTS model (TODO insert link). We can now update our $\theta$ values to reflect the REM results.
+Looking at the data, we can see that our random effects model has generated a value for $\mu$, $\tau$ and $\theta$. This prediction uses the [NUTS model](http://www.stat.columbia.edu/~gelman/research/published/nuts.pdf), which is similar to the [Hamiltonian Monte Carlo method (HMC)](https://theclevermachine.wordpress.com/2012/11/18/mcmc-hamiltonian-monte-carlo-a-k-a-hybrid-monte-carlo/) but doesn't require the user to specify a step size or number of steps. 
+
+We can now update our $\theta$ values to reflect the REM results.
 
 ```{r}
 # Readjust knowledge of Y based on REM

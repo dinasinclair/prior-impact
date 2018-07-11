@@ -1,0 +1,184 @@
+---
+title: "Bayesian Helper Functions"
+author: "Dina Sinclair"
+date: "May 15, 2018"
+output: html_document
+---
+```{r, echo=FALSE }
+# Set up workspace
+rm(list = ls())
+set.seed(1)
+
+# Load packages
+# require(data.table)
+# library(ggplot2)
+# require(Rcpp)
+# require(RcppEigen) 
+# library(gridExtra)
+# library(dplyr)
+# library(splitstackshape)
+# library(sem)
+# library(plyr)
+# library(reshape)
+# library(matrixStats)
+# library(metafor)
+# library(stringr)
+```
+## Basic Definitions
+
+What we're working with here, drawing heavily from the HMCWG paper section 2.1:
+
+
+* $Y_i$ is the point estimate in study $i$
+* $\theta_i$ is the true effect in study $i$
+* $\mu$ is the unknown mean of the distribution of $\theta_i$ 
+* $\tau^2$ is the unknown variance of the distribution of $\theta_i$
+
+
+$\mu$ and $\tau^2$ are known as *hyperparameters* since they model another one of our model variables, $\theta_i$.
+
+$$\theta_i \sim N(\mu, \tau^2)$$
+
+##First helper function: Suff Theta
+```{r}
+suff_theta <- function(Y, mu, tau2, sigma2){
+  #vectorize for the whole sample size instead of one sample each run 
+  n <- length(Y)
+  m <- length(tau2)
+  mean <- (matrix(Y, ncol = n, nrow = m, byrow = TRUE)*tau2 + 
+             matrix(sigma2, ncol = n, nrow = m, byrow = TRUE)*mu) / 
+    (matrix(sigma2, ncol = n, nrow = m, byrow = TRUE) + tau2)
+  var <- matrix(sigma2, ncol = n, nrow = m, byrow = TRUE)*tau2 /
+    (matrix(sigma2, ncol = n, nrow = m, byrow = TRUE) + tau2)
+  #return the mean and variance for all e_i samples
+  #in matrix with nrow = # of e_i and ncol = #samples
+  return(list(mean = mean, var = var))
+}
+```
+Okay. So here we're looking at a matrix divided by another matrix to get a mean, specifically
+$$ mean = \frac{A \tau^2 + B \mu}{B + \tau^2}$$
+And a second one for variance
+$$var = \frac{B\tau^2}{B+\tau^2} = \frac{1}{\frac{1}{\tau^2}+\frac{1}{B}}$$
+where $A$ is a matrix form of $Y$ and $B$ is a matrix form of $\sigma^2$. These are the same as the two equations (8) in section 2.2 of HMCWG.
+
+##Second helper function: Suff Mu
+Here's the code:
+```{r}
+# sufficient statistics for P(mu|tau, Y)
+suff_mu <- function(Y, sigma2, tau2){
+  #one time each calculate, hard to vectorize
+  lambda <- sum(Y/(sigma2 + tau2))
+  omegai <- sum(1/(sigma2 + tau2))
+  omega <- 1/omegai
+  #return lambda and omega defined in the reference
+  return(list(lambda = lambda, omega = omega))
+}
+```
+Which mathematically is saying given $Y, \sigma^2$ and $\tau^2$,
+\begin{align*}
+\lambda &= \sum \frac{Y}{\sigma^2 + \tau^2} \\
+\omega_i &= \sum \frac{1}{\sigma^2 + \tau^2} \\
+\omega &= \frac{1}{\omega_i}
+\end{align*}
+
+Eva says the $\omega$ stuff is just to help with variance. Would that mean that 
+$$V_\mu =\frac{1}{\sum \frac{1}{\sigma^2 + \tau^2}}=\omega$$
+which matches up to equation (10) in section 2.2. Also from equation (10), we get that
+$$\hat{\mu} = \frac{\lambda}{\omega_i} = \lambda \omega$$
+so indeed, having $\lambda$ and $\omega$ is sufficient to derive $\mu$.
+
+##Third helper function: Post Tau Squared
+```{r}
+# posterior samples from P(tau|Y), also get all the suff-stats for P(mu|tau, Y)
+post_tau2 <- function(Y, sigma2, tau2, n.sims){
+  # P(beta|tau, Y)
+  N <- length(tau2) #grid length
+  log_p <- rep(NA, N)
+  lambda <- log_p
+  omega <- log_p
+  # run all the points we choose on the tau_grid
+  for(ii in 1:N){
+    suff <- suff_mu(Y, sigma2, tau2[ii])
+    lambda[ii] <- suff$lambda*suff$omega
+    omega[ii] <- suff$omega
+    log_p[ii] <- 0.5*log(omega[ii]) - 0.5*sum(log(sigma2+tau2[ii])) - 
+      0.5*sum((Y - lambda[ii])^2/(sigma2 + tau2[ii]))
+  }
+  log_p <- log_p - max(log_p) 
+  p <- exp(log_p)
+  p <- p/sum(p)
+  index <- sample(1:N, n.sims, replace = T, prob = p)
+  tau2 <- tau2[index]
+  mean <- lambda[index]
+  omega <- (sqrt(omega))[index]
+  # return all the selected tau2 and mean (beta) and omega (for beta). 
+  return(list(tau2 = tau2, mean = mean, omega = omega))
+}
+```
+This is looking for $p(\mu | \tau, Y)$. 
+
+$\lambda$ and $\omega$ are vectors of length $\tau^2$, start off as full of NAs.
+
+What is the 'tau grid'? For every tau, we're going to calculate a new $\lambda_I$ and $\omega_I$
+
+1. Calculate sufficient $\mu$ for given $\tau_i$, get $\omega_I$ and $\lambda_I$
+2. Calculate $\lambda_i = \lambda_I \omega_I$ **wait, isn't that equal to $\mu$?**
+3. Calculate $\omega_i = \omega_I$
+4. Then find $\log(p)$ using
+
+$$\log(p)_i = \frac 1 2 \log(\omega_i) - \frac 1 2 \sum\log(\sigma^2+\tau^2_i)
+-\frac 1 2 \sum \frac{(Y-\lambda_i)^2}{\sigma^2 + \tau^2_i}$$ 
+
+This is almost equation (15) of section 2.2, if we take the log of both sides, do some algebra, and remember that $\hat{\mu}=\lambda_i$ and $V_\mu = \omega_i$. Specifically,
+
+\begin{align*}
+p(\tau|Y) &\propto p(\tau)V_\mu^{1/2}\Pi_i(\sigma^2_i + \tau^2)^{-1/2} \exp \left(-\frac{(Y-\hat{\mu})^2}{2(\sigma^2_i+\tau^2)}\right) \\
+\log(p(\tau|Y)) &\propto 
+\log(p(\tau)) + \frac 1 2 \log(V_\mu)
+-\frac 1 2 \sum_i\log(\sigma^2_i + \tau^2) 
+-\frac 1 2 \sum_i \frac{(Y-\hat{\mu})^2}{\sigma^2_i+\tau^2}
+\end{align*}
+
+Question: **What happens to the $\log(p(\tau))$ term?**
+
+**Then you have some normalization going on?**
+$$\log(p) \leftarrow \log(p) - max(\log(p))$$
+**Also why the index command?**
+
+
+##Fourth helper function: Post Mix S
+```{r}
+#combine all the above functions for a joint sample of (theta, mu, tau)
+#data is the raw data from the .csv selecting a certain group
+#tau2 is in the grid
+#Y <- data$treatmentcoefficient
+post_mix_s <- function(data, Y, tau2, n_sim,onlymu = F){
+  sigma2 <- (data$treatmentstandarderror)^2
+  #first sample tau2
+  tau2 <- post_tau2(Y, sigma2, tau2, n_sim)
+  #also get mean and variance for beta
+  mean <- tau2$mean
+  omega <- tau2$omega
+  tau2 <- tau2$tau2
+  #calculate mu
+  mu <- rnorm(n_sim)
+  mu <- mu*omega + mean   
+  if(onlymu){
+    return(list(mu=mu))
+  } else{
+    #calculate suff-stats for theta
+    theta <- suff_theta(Y, mu, tau2, sigma2)
+    #sample theta
+    theta <- array(rnorm(length(theta$mean), theta$mean, sqrt(theta$var)), 
+                   dim = dim(theta$mean))
+    #I2 calculation (reference page 161 "metafor.pdf")
+    s2 <- (nrow(data)-1)*sum(1/sigma2)/((sum(1/sigma2))^2 - sum(1/sigma2^2))
+    temp <- (mean(sqrt(tau2)))^2
+    I2 <- 100*temp/(temp + s2)
+    return(list(theta = t(theta), tau2 = tau2, mu = mu, I2 = I2))  
+  }
+  
+}
+```
+
+
