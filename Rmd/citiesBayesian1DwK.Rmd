@@ -74,7 +74,7 @@ We can then reshape the data to a more convenient structure, where Y is a list c
 
 ```{r}
 # Save our generated input data together in a list
-basic_dat_generated <- list(I=I,Y=Y$mean,sigmaSq=Y$sigmaSq)
+basic_dat_generated <- list(I=I,Y=Y$mean,sigmaSq=Y$var)
 
 # Display what we've generated
 basic_dat_generated

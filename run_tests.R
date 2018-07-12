@@ -2,8 +2,8 @@
 
 library(testthat) 
 
-source('~/Documents/Oxford/Evaluating Prior Impact/citiesBayesian1DwK.Rmd')
+#source('citiesBayesian1DwK.R')
 
-test_results <- test_dir('~/Documents/Oxford/Evaluating Prior Impact/citiesBayesian1DwK.R', reporter="summary")
+test_results <- test_dir(path = '.', reporter="summary")
 
 
