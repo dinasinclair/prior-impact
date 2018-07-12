@@ -11,7 +11,7 @@
 
 <meta name="author" content="Dina Sinclair" />
 
-<meta name="date" content="2018-07-11" />
+<meta name="date" content="2018-07-12" />
 
 <title>Bayesian Cities Model 1D</title>
 
@@ -119,7 +119,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">Bayesian Cities Model 1D</h1>
 <h4 class="author"><em>Dina Sinclair</em></h4>
-<h4 class="date"><em>2018-07-11</em></h4>
+<h4 class="date"><em>2018-07-12</em></h4>
 
 </div>
 
@@ -172,7 +172,7 @@ sigmaSq &lt;- 10*runif(I) # with sigmaSq ~ U(0,1)
 Y &lt;- list(mean=theta, var=sigmaSq)</code></pre>
 <p>We can then reshape the data to a more convenient structure, where Y is a list containing all of the theta and sigmaSq values. The stan file also needs all of the data in a specific format, which we’re creating here in the list basic_dat_generated.</p>
 <pre class="r"><code># Save our generated input data together in a list
-basic_dat_generated &lt;- list(I=I,Y=Y$mean,sigmaSq=Y$sigmaSq)
+basic_dat_generated &lt;- list(I=I,Y=Y$mean,sigmaSq=Y$var)
 
 # Display what we've generated
 basic_dat_generated</code></pre>
@@ -183,7 +183,7 @@ basic_dat_generated</code></pre>
 ## [1] 8.564561 9.887377 9.670507
 ## 
 ## $sigmaSq
-## NULL</code></pre>
+## [1] 2.068877 1.871036 7.799697</code></pre>
 </div>
 </div>
 <div id="step-1-calculate-theta_i-mu-tau2-using-the-original-priors-y" class="section level3">
@@ -195,7 +195,7 @@ basic_dat_generated</code></pre>
 <li><em>iter</em>, the number of iterations of each chain (default is 2000)</li>
 <li><em>chains</em>, the number of markov chains (default is 4)</li>
 </ul>
-<pre class="r"><code>fit &lt;- stan(file = 'randomEffectsModel1D.stan', 
+<pre class="r"><code>fit &lt;- stan(file = '../randomEffectsModel1D.stan', 
             data = basic_dat_generated, 
             iter = 1000, chains = 2)</code></pre>
 <pre><code>## In file included from C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config.hpp:39:0,
@@ -206,7 +206,7 @@ basic_dat_generated</code></pre>
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math/rev/mat.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/stan/math.hpp:4,
 ##                  from C:/Users/Dina/Documents/R/win-library/3.3/StanHeaders/include/src/stan/model/model_header.hpp:4,
-##                  from file8bb8368a6100.cpp:8:
+##                  from filed8e45d046919.cpp:8:
 ## C:/Users/Dina/Documents/R/win-library/3.3/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: &quot;BOOST_NO_CXX11_RVALUE_REFERENCES&quot; redefined
 ##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
 ##  ^
@@ -214,8 +214,8 @@ basic_dat_generated</code></pre>
 ## 
 ## SAMPLING FOR MODEL 'randomEffectsModel1D' NOW (CHAIN 1).
 ## 
-## Gradient evaluation took 0.001 seconds
-## 1000 transitions using 10 leapfrog steps per transition would take 10 seconds.
+## Gradient evaluation took 0 seconds
+## 1000 transitions using 10 leapfrog steps per transition would take 0 seconds.
 ## Adjust your expectations accordingly!
 ## 
 ## 
@@ -233,8 +233,8 @@ basic_dat_generated</code></pre>
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
 ##  Elapsed Time: 0.034 seconds (Warm-up)
-##                0.038 seconds (Sampling)
-##                0.072 seconds (Total)
+##                0.036 seconds (Sampling)
+##                0.07 seconds (Total)
 ## 
 ## 
 ## SAMPLING FOR MODEL 'randomEffectsModel1D' NOW (CHAIN 2).
@@ -257,9 +257,9 @@ basic_dat_generated</code></pre>
 ## Iteration: 900 / 1000 [ 90%]  (Sampling)
 ## Iteration: 1000 / 1000 [100%]  (Sampling)
 ## 
-##  Elapsed Time: 0.034 seconds (Warm-up)
+##  Elapsed Time: 0.033 seconds (Warm-up)
 ##                0.033 seconds (Sampling)
-##                0.067 seconds (Total)</code></pre>
+##                0.066 seconds (Total)</code></pre>
 <pre><code>## Warning: There were 43 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. See
 ## http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</code></pre>
 <pre><code>## Warning: Examine the pairs() plot to diagnose sampling problems</code></pre>
@@ -277,7 +277,7 @@ basic_dat_generated</code></pre>
 ## theta[3]   8.95    0.19  4.21   0.18   6.86   9.06  11.21 18.21   477 1.00
 ## lp__     -13.94    0.44  3.38 -21.94 -15.89 -13.47 -11.53 -8.88    58 1.04
 ## 
-## Samples were drawn using NUTS(diag_e) at Wed Jul 11 14:41:03 2018.
+## Samples were drawn using NUTS(diag_e) at Thu Jul 12 15:01:19 2018.
 ## For each parameter, n_eff is a crude measure of effective sample size,
 ## and Rhat is the potential scale reduction factor on split chains (at 
 ## convergence, Rhat=1).</code></pre>
@@ -354,7 +354,7 @@ get_pilot_results &lt;- function(K,Y){
   Y_P &lt;- get_pilot_results(K,Y)
   # Update thetas
   updated_dat_generated &lt;- list(I, Y=Y_P$mean, sigmaSq=Y_P$var)
-  fit_updated &lt;- stan(file = 'randomEffectsModel1D.stan', 
+  fit_updated &lt;- stan(file = '../randomEffectsModel1D.stan', 
                       data = updated_dat_generated, 
                       iter = 1000, chains = 2)
   # Use new thetas to get a new city ranking
@@ -374,7 +374,7 @@ original_rank
 # Generate all combinations of cities $K$, store them in vector 'combinations'
 combinations &lt;-combn(seq(I),num_pilots)
 # Initiate number of minds changed (nmc) to zero
-nmc &lt;- numeric(I)
+nmc &lt;- numeric(ncol(combinations))
 
 # Loop through all combinations K, updating nmc num_hypothetical_draws times
 for (i in 1:ncol(combinations)){

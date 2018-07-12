@@ -95,7 +95,7 @@ To make use of this assumption, we need to estimate scalars $\mu$ and $\tau^2$ a
 * *chains*, the number of markov chains (default is 4)
 
 ```{r}
-fit <- stan(file = 'randomEffectsModel1D.stan', 
+fit <- stan(file = '../randomEffectsModel1D.stan', 
             data = basic_dat_generated, 
             iter = 1000, chains = 2)
 ```
@@ -206,7 +206,7 @@ change_mind <- function(K,Y,original_rank){
   Y_P <- get_pilot_results(K,Y)
   # Update thetas
   updated_dat_generated <- list(I, Y=Y_P$mean, sigmaSq=Y_P$var)
-  fit_updated <- stan(file = 'randomEffectsModel1D.stan', 
+  fit_updated <- stan(file = '../randomEffectsModel1D.stan', 
                       data = updated_dat_generated, 
                       iter = 1000, chains = 2)
   # Use new thetas to get a new city ranking
@@ -230,7 +230,7 @@ original_rank
 # Generate all combinations of cities $K$, store them in vector 'combinations'
 combinations <-combn(seq(I),num_pilots)
 # Initiate number of minds changed (nmc) to zero
-nmc <- numeric(I)
+nmc <- numeric(ncol(combinations))
 
 # Loop through all combinations K, updating nmc num_hypothetical_draws times
 for (i in 1:ncol(combinations)){
