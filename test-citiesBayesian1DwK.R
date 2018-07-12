@@ -17,8 +17,8 @@ context('testing generate_basic')
 test_that('Dimensions', {
   basic <- generate_basic(I=3,SF=1,mu=2,tau=2)
   expect_equal(basic$I,3)
-  expect_equal(length(basic$Y), 3)
-  expect_equal(length(basic$sigmaSq),3)
+  expect_length(basic$Y, 3)
+  expect_length(basic$sigmaSq,3)
 })
 
 test_that('TauSq Zero', {
@@ -39,6 +39,18 @@ test_that('SF (SigmaSq Mult Factor) Zero', {
 
 # Test that bayesian stuff is giving similar answers to a non-NUTS framework? Need to find one...
 # This involves testing the stan file separately, tbh
+context('testing stan fit and extraction')
+
+test_that('Stan code generation', {
+  # Fun fact: using 0 for sigma sq means it doesn't converge/work the way one would want. TODO look at why that would happen?
+  data <- list(I=2,Y=c(2,2),sigmaSq=c(1,1))
+  Y <- extract_fit(data)
+  expect_true(mean(Y$mean) >= 1.5)
+  expect_true(mean(Y$mean) <= 2.5)
+  expect_equal(Y$var, c(1,1))
+})
+
+#extract_fit<- function(basic_dat_generated)
 
 # Test that we're getting all of the combinations
 

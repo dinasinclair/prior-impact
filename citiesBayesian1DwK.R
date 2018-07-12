@@ -1,13 +1,5 @@
 library("rstan")
 
-# Set general constants
-# I <- 3 # Number of cities
-# num_pilots <- 2 # Number of pilots
-# num_final_cities <- 2 # Number of cities we can implement the final program in
-# num_hypothetical_draws <- 10 # Number of times you simulate pilot study results
-# Q <- 5 # Pilot quality (variance multiplication factor)
-# set.seed(17) # Ensure randomization is reproducible through a specified seed
-
 generate_basic <- function(I,SF,mu,tauSq){
   
   # Generate theta and sigmaSq
@@ -23,6 +15,7 @@ generate_basic <- function(I,SF,mu,tauSq){
 }
 
 extract_fit<- function(basic_dat_generated){
+  Y <- list(mean = basic_dat_generated$Y, var = basic_dat_generated$sigmaSq)
   fit <- stan(file = 'randomEffectsModel1D.stan', 
               data = basic_dat_generated, 
               iter = 1000, chains = 2)
@@ -128,7 +121,10 @@ overall<-function(I, SF, num_pilots,num_final_cities,num_hypothetical_draws,Q,se
   } 
 }
 
-generate_basic(I=3,SF=0,mu=10,tauSq=0)
+
+
+data <- list(I=2,Y=c(2,2),sigmaSq=c(1,1))
+extract_fit(data)
 
 # overall(I=3,
 #         SF=1,
