@@ -35,7 +35,6 @@ get_pilot_results <- function(K,Y,Q){
   
   # Update for each new pilot k
   for (k in K){
-    
     # Gather New Pilot Data
     new_sigmaSq <- Y$var[k] * (1/Q)
     new_mean <- rnorm( 1 , mean = Y$mean[k] , sd = sqrt(new_sigmaSq ))
@@ -44,8 +43,9 @@ get_pilot_results <- function(K,Y,Q){
     post_pilot <- update_Y(Y$mean[k],new_mean,Y$var[k],new_sigmaSq)
     Y_P$mean[k] <- post_pilot$mean
     Y_P$var[k] <- post_pilot$var
-    return(Y_P)
+
   }
+  return(Y_P)
 }
 
 update_Y <- function(mu1, mu2, sigSq1, sigSq2){
@@ -64,7 +64,7 @@ new_ranking <- function(fit_updated,Y_P) {
   return(new_rank)
 }
 
-change_mind <- function(K,Y,original_rank,num_final_cities){
+change_mind <- function(K,Y,original_rank,num_final_cities,I,Q){
   # This function returns TRUE if the pilots run in K change the final actions
   # and returns FALSE otherwise, given original ranking and data Y.
   
@@ -121,10 +121,8 @@ overall<-function(I, SF, num_pilots,num_final_cities,num_hypothetical_draws,Q,se
   } 
 }
 
-
-
-data <- list(I=2,Y=c(2,2),sigmaSq=c(1,1))
-extract_fit(data)
+# data <- list(I=2,Y=c(2,2),sigmaSq=c(1,1))
+# extract_fit(data)
 
 # overall(I=3,
 #         SF=1,
@@ -136,3 +134,10 @@ extract_fit(data)
 #         mu=2,
 #         tau=1)
 
+# Y <- list(mean = c(0,0), var = c(1,1))
+# Y_P <- get_pilot_results(K=c(1,2),Y=Y,Q=1)
+# Y
+# Y_P
+
+Y <- list(mean = c(-1000,0,0,0), var = c(1,1,1,1))
+change_mind(K=c(1),Y,original_rank=c(1,2,3,4),num_final_cities=1,I=4,Q=1)
