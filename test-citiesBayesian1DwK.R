@@ -10,8 +10,26 @@ test_that('test1', {
   expect_equal(I,3)
 })
 
-
+context('testing generate_basic')
 # Test to see that the dimensions of everything are okay
+# remember  basic_dat_generated <- list(I=I,Y=Y$mean,sigmaSq=Y$var)
+
+test_that('Dimensions', {
+  basic <- generate_basic(I=3,SF=1,mu=2,tau=2)
+  expect_equal(basic$I,3)
+  expect_equal(length(basic$Y), 3)
+  expect_equal(length(basic$sigmaSq),3)
+})
+
+test_that('TauSq Zero', {
+  basic <- generate_basic(I=3,SF=1,mu=2,tauSq=0)
+  expect_equal(mean(basic$Y), 2)
+})
+
+test_that('SF (SigmaSq Mult Factor) Zero', {
+  basic <- generate_basic(I=3,SF=0,mu=2,tauSq=2)
+  expect_equal(mean(basic$sigmaSq), 0)
+})
 
 # Test that if var is 0, that we'd get what we'd expect both in the case where you change your mind
 # the case where you wouldn't change your mind

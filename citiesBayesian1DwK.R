@@ -8,7 +8,7 @@ library("rstan")
 # Q <- 5 # Pilot quality (variance multiplication factor)
 # set.seed(17) # Ensure randomization is reproducible through a specified seed
 
-generate_basic <- function(I,SF,mu,tau){
+generate_basic <- function(I,SF,mu,tauSq){
   
   # Generate theta and sigmaSq
   theta <- rnorm(I, mean = mu, sd = sqrt(tauSq)) # with theta ~ N(mu,tauSq)
@@ -104,28 +104,34 @@ overall<-function(I, SF, num_pilots,num_final_cities,num_hypothetical_draws,Q,se
   
   # Generate all combinations of cities $K$, store them in vector 'combinations'
   combinations <-combn(seq(I),num_pilots)
+  print(combinations)
   # Initiate number of minds changed (nmc) to zero
-  nmc <- numeric(I)
+  nmc <- numeric(ncol(combinations))
   
   # Loop through all combinations K, updating nmc num_hypothetical_draws times
   for (i in 1:ncol(combinations)){
     for (j in 1:num_hypothetical_draws){
+      print("i is")
+      print(i)
       K <- combinations[,i]
       nmc[i] <- nmc[i] + change_mind(K,Y,original_rank,num_final_cities)
     }
   } 
   
   print(Y)
+  print("nmc")
+  print(nmc)
+  print(combinations)
   for (i in 1:length(nmc)){
     print(combinations[,i])
     print(paste("Number of times minds changed: ",nmc[i],"/",num_hypothetical_draws))
   } 
 }
 
-generate_basic(I=3,SF=1,mu=2,tau=2)
+generate_basic(I=3,SF=0,mu=10,tauSq=0)
 
-# overall(I=3, 
-#         SF=1, 
+# overall(I=3,
+#         SF=1,
 #         num_pilots=3,
 #         num_final_cities=2,
 #         num_hypothetical_draws=1,
