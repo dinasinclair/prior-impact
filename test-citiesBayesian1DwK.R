@@ -13,14 +13,14 @@ test_that('Dimensions', {
 })
 
 # Test that if we set Tau Squared to 0, we get no variation in theta~(mu,0)
-test_that('TauSq Zero', {
-  basic <- generate_basic(I=3,SF=1,mu=2,tauSq=0)
+test_that('Tau Zero', {
+  basic <- generate_basic(I=3,SF=1,mu=2,tau=0)
   expect_equal(basic$Y, c(2,2,2))
 })
 
 # Test that if we say that sigma should be zero, that it is indeed zero
 test_that('SF (SigmaSq Mult Factor) Zero', {
-  basic <- generate_basic(I=3,SF=0,mu=2,tauSq=2)
+  basic <- generate_basic(I=3,SF=0,mu=2,tau=2)
   expect_equal(basic$sigmaSq, c(0,0,0))
 })
 
@@ -31,7 +31,7 @@ context('testing stan fit and extraction')
 test_that('Stan code generation', {
   # Fun fact: using 0 for sigma sq means it doesn't converge/work the way one would want. TODO look at why that would happen?
   data <- list(I=2,Y=c(2,2),sigmaSq=c(1,1))
-  Y <- extract_fit(data)
+  Y <- extract_fit(data)$Y
   expect_true(mean(Y$mean) >= 1.5)
   expect_true(mean(Y$mean) <= 2.5)
   expect_equal(Y$var, c(1,1))
@@ -70,27 +70,29 @@ test_that('Test Q and variance function', {
 context('testing overall function')
 # Test that we're getting all of the combinations
 test_that('Test combination length', {
-  nmc <-overall(I=4,SF=1,num_pilots=2,num_final_cities=2,num_draws=1,mu=1,tau=1)
-  expect_length(nmc,6)
+  data <- generate_basic(I=4,SF=1,mu=20,tau=2)
+  results <-overall(data=data,num_pilots=2,num_final_cities=2,num_draws=1)
+  expect_length(results$nmc,6)
 })
 
 
 # Test stan part
 context('testing stan model')
 test_that('Compare to metafor', {
-  basic <- generate_basic(I=10,SF=1,mu=20,tauSq=2)
+  basic <- generate_basic(I=10,SF=1,mu=20,tau=2)
   # Use RMA model from metafor to check
   metafor.REM <- rma(yi=basic$Y, vi=basic$sigmaSq)
   metafor.REM.mu <- coef(metafor.REM)
-  metafor.REM.tau2 <- metafor.REM$tau2
+  metafor.REM.tau <- sqrt(metafor.REM$tau2)
   
   # Comp to stan version
-  stan.REM <-  extract(stan(file = 'randomEffectsModel1D.stan', data = basic, iter = 1000, chains = 2))
-  stan.REM.mu <- mean(stan.REM$mu)
-  stan.REM.tau2 <- (mean(stan.REM$tau))^2
+  stan.REM <-  extract_fit(basic)
   
-  expect(abs(stan.REM.mu - metafor.REM.mu) <= 2)
-  expect(abs(stan.REM.tau2 - metafor.REM.tau2) <= 0.2)
+  print(metafor.REM.tau)
+  print(stan.REM$tau)
+  
+  expect(abs(stan.REM$mu - metafor.REM.mu) <= 2)
+  expect(abs(stan.REM$tau - metafor.REM.tau) <= 0.5)
 })
 
 # TODO

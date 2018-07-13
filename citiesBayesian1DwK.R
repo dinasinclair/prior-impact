@@ -1,9 +1,9 @@
 library("rstan")
 
-generate_basic <- function(I,SF,mu,tauSq){
+generate_basic <- function(I,mu,tau,SF=1){
   
   # Generate theta and sigmaSq
-  theta <- rnorm(I, mean = mu, sd = sqrt(tauSq)) # with theta ~ N(mu,tauSq)
+  theta <- rnorm(I, mean = mu, sd = tau) # with theta ~ N(mu,tau)
   sigmaSq <- SF*runif(I) # with sigmaSq ~ U(0,1)
   Y <- list(mean=theta, var=sigmaSq)
   
@@ -14,10 +14,11 @@ generate_basic <- function(I,SF,mu,tauSq){
   return(basic_dat_generated)
 }
 
-extract_fit<- function(basic_dat_generated){
-  Y <- list(mean = basic_dat_generated$Y, var = basic_dat_generated$sigmaSq)
+extract_fit<- function(data){
+  # data has the form list(I=I,Y=Y$mean,sigmaSq=Y$var)
+  Y <- list(mean = data$Y, var = data$sigmaSq)
   fit <- stan(file = 'randomEffectsModel1D.stan', 
-              data = basic_dat_generated, 
+              data = data, 
               iter = 1000, chains = 2)
   
   # Readjust knowledge of Y based on REM
@@ -25,7 +26,7 @@ extract_fit<- function(basic_dat_generated){
   for (i in 1:length(Y$mean)){
     Y$mean[i] <- mean(params$theta[,i])
   }
-  return(Y)
+  return(list(Y=Y,mu=mean(params$mu), tau=mean(params$tau)))
 }
 
 # Calculate new data for all K new pilots
@@ -70,79 +71,57 @@ change_mind <- function(K,Y,original_rank,num_final_cities,Q=1){
   
   # Simulate pilots
   Y_P <- get_pilot_results(K,Y,Q)
+  
   # Update thetas
-  updated_dat_generated <- list(I=length(Y$mean), Y=Y_P$mean, sigmaSq=Y_P$var)
-  fit_updated <- stan(file = 'randomEffectsModel1D.stan', 
-                      data = updated_dat_generated, 
-                      iter = 1000, chains = 2)
+  updated_data <- list(I=length(Y$mean), Y=Y_P$mean, sigmaSq=Y_P$var)
+  Y_updated <- extract_fit(updated_data)$Y
+  
   # Use new thetas to get a new city ranking
-  new_rank <- new_ranking(fit_updated,Y_P) 
-  print(new_rank)
+  new_rank <- order(Y_updated$mean, decreasing=TRUE)
+  
   # Take the top F cities from each ranking as final city choice
   original_choice <- original_rank[1:num_final_cities]
   new_choice <- new_rank[1:num_final_cities]
+  
   # Return the setequality of the two rankings (set bc order doesn't matter)
   return(!setequal(original_choice,new_choice))
 }
 
-overall<-function(I,SF,num_pilots,num_final_cities,num_draws,mu,tau,Q=1,seed=17){
-  
-  set.seed(seed)
-  basic_dat_generated <- generate_basic(I,SF,mu,tau)
-  print(basic_dat_generated)
-  Y <- extract_fit(basic_dat_generated)
+overall<-function(data,num_pilots,num_final_cities,num_draws,Q=1){
+
+  # Do initial REM fit
+  Y <- extract_fit(data)$Y
   
   # Calculate the city ranking of the original data
   original_rank <- order(Y$mean, decreasing=TRUE)
-  original_rank
   
   # Generate all combinations of cities $K$, store them in vector 'combinations'
-  combinations <-combn(seq(I),num_pilots)
-  print(combinations)
+  combinations <-combn(seq(data$I),num_pilots)
+
   # Initiate number of minds changed (nmc) to zero
   nmc <- numeric(ncol(combinations))
   
   # Loop through all combinations K, updating nmc num_draws times
   for (i in 1:ncol(combinations)){
     for (j in 1:num_draws){
-      print("i is")
-      print(i)
       K <- combinations[,i]
       nmc[i] <- nmc[i] + change_mind(K,Y,original_rank,num_final_cities)
     }
   } 
   
-  print(Y)
-  print("nmc")
-  print(nmc)
-  print(combinations)
-  for (i in 1:length(nmc)){
-    print(combinations[,i])
-    print(paste("Number of times minds changed: ",nmc[i],"/",num_draws))
-  } 
-  return(nmc)
+  # print(Y)
+  # print("nmc")
+  # print(nmc)
+  # print(combinations)
+  # for (i in 1:length(nmc)){
+  #   print(combinations[,i])
+  #   print(paste("Number of times minds changed: ",nmc[i],"/",num_draws))
+  # } 
+  return(list(nmc=nmc, combinations=combinations))
 }
 
-# data <- list(I=2,Y=c(2,2),sigmaSq=c(1,1))
-# extract_fit(data)
+data <- generate_basic(I=4,SF=1,mu=20,tau=2)
+results <-overall(data=data,num_pilots=2,num_final_cities=2,num_draws=1)
 
-# overall(I=3,
-#         SF=1,
-#         num_pilots=3,
-#         num_final_cities=2,
-#         num_draws=1,
-#         Q=5,
-#         seed=17,
-#         mu=2,
-#         tau=1)
-
-# Y <- list(mean = c(0,0), var = c(1,1))
-# Y_P <- get_pilot_results(K=c(1,2),Y=Y,Q=1)
-# Y
-# Y_P
-# 
-# Y <- list(mean = c(-1000,0,0,0), var = c(1,1,1,1))
-# change_mind(K=c(1),Y,original_rank=c(1,2,3,4),num_final_cities=1,I=4,Q=1)
-
-# Y <- list(mean = c(0,0,0,0,0,0,0), var = c(100,100,100,100,100,100,100))
-# change_mind(K=c(2,3,4,5,6,7),Y,original_rank=c(1,2,3,4,5,6,7),num_final_cities=1)
+results
+data
