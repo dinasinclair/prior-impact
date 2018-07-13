@@ -1,12 +1,6 @@
 # Test file for Bayesian Cities 1D file
+library("metafor")
 source('citiesBayesian1DwK.R')
- 
-
-context('testing if I can write tests')
-
-test_that('test1', {
-  expect_equal(I,3)
-})
 
 context('testing generate_basic')
 
@@ -49,12 +43,12 @@ context('testing change mind')
 
 test_that('Expect to change mind if original idea is terrible', {
   Y <- list(mean = c(-1000,0,0,0), var = c(1,1,1,1))
-  expect_true(change_mind(K=c(1),Y,original_rank=c(1,2,3,4),num_final_cities=1,I=4,Q=1))
+  expect_true(change_mind(K=c(1),Y,original_rank=c(1,2,3,4),num_final_cities=1))
 })
 
-test_that('Expect not to change mind if variance is really small # TODO this is a bad test, fix', {
-  Y <- list(mean = c(400,300,200,100), var = c(.01,.01,.01,.01))
-  expect_false(change_mind(K=c(1,2,3,4),Y,original_rank=c(1,2,3,4),num_final_cities=1,I=4,Q=1))
+test_that('Expect to change mind if variance is really large', {
+  Y <- list(mean = c(0,0,0,0,0,0,0), var = c(100,100,100,100,100,100,100))
+  expect_true(change_mind(K=c(2,3,4,5,6,7),Y,original_rank=c(1,2,3,4,5,6,7),num_final_cities=1))
 })
 
 context('testing pilot generation')
@@ -73,7 +67,35 @@ test_that('Test Q and variance function', {
   expect_false(isTRUE(all.equal(Y_P$mean, Y$mean)))
 })
 
+context('testing overall function')
 # Test that we're getting all of the combinations
+test_that('Test combination length', {
+  nmc <-overall(I=4,SF=1,num_pilots=2,num_final_cities=2,num_draws=1,mu=1,tau=1)
+  expect_length(nmc,6)
+})
 
+
+# Test stan part
+context('testing stan model')
+test_that('Compare to metafor', {
+  basic <- generate_basic(I=10,SF=1,mu=20,tauSq=2)
+  # Use RMA model from metafor to check
+  metafor.REM <- rma(yi=basic$Y, vi=basic$sigmaSq)
+  metafor.REM.mu <- coef(metafor.REM)
+  metafor.REM.tau2 <- metafor.REM$tau2
+  
+  # Comp to stan version
+  stan.REM <-  extract(stan(file = 'randomEffectsModel1D.stan', data = basic, iter = 1000, chains = 2))
+  stan.REM.mu <- mean(stan.REM$mu)
+  stan.REM.tau2 <- (mean(stan.REM$tau))^2
+  
+  expect(abs(stan.REM.mu - metafor.REM.mu) <= 2)
+  expect(abs(stan.REM.tau2 - metafor.REM.tau2) <= 0.2)
+})
+
+# TODO
 # Try setting the seed a few different ways, see if get the same results?
-
+# Also decide on better way to structure fit/extraction code to help w better testing
+# But okay I believe things for now?
+# Also, the stan and metafor methods aren't giving the same answer. How similar do they need to be to be reasonable? They
+# look reasonable-ish...

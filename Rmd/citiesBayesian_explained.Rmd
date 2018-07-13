@@ -27,16 +27,16 @@ Before we input data into the model, we need to set a few key constants. These a
 * *I*, the total number of cities we have priors on and are considering for the final program
 * *num_pilots*, the number of cities we can run a pilot program in
 * *num_final_cities*, the number of cities we can implement the final program in
-* *num_hypothetical_draws*, the number of times we'll simulate the results of each potential pilot choice
+* *num_draws*, the number of times we'll simulate the results of each potential pilot choice
 * *Q*, the `quality' of the new pilot data (the factor by which the pilot data variance will differ from the original variance). A Q of 5 implies the pilot data has a variance that is 5 times smaller than the original study variance.
 
 
 ```{r}
 # Set general constants
-I <- 3 # Number of cities
+I <- 5 # Number of cities
 num_pilots <- 2 # Number of pilots
 num_final_cities <- 2 # Number of cities we can implement the final program in
-num_hypothetical_draws <- 10 # Number of times you simulate pilot study results
+num_draws <- 10 # Number of times you simulate pilot study results
 Q <- 5 # Pilot quality (variance multiplication factor)
 set.seed(17) # Ensure randomization is reproducible through a specified seed
 ```
@@ -66,7 +66,7 @@ To generate $\theta_i$, we then use the fact that $\theta_i \sim N(\mu, \tau^2)$
 ```{r}
 # Generate theta and sigmaSq
 theta <- rnorm(I, mean = mu, sd = sqrt(tauSq)) # with theta ~ N(mu,tauSq)
-sigmaSq <- 10*runif(I) # with sigmaSq ~ U(0,1)
+sigmaSq <- 1*runif(I) # with sigmaSq ~ U(0,1)
 Y <- list(mean=theta, var=sigmaSq)
 ```
 
@@ -219,7 +219,7 @@ change_mind <- function(K,Y,original_rank){
 }
 ```
 
-Since the *change_mind* function returns a probabilistically generated result, we need to run the function many times to get a sense of how likely a given choice of cities $K$ will change our minds. Therefore, for each possible subset of cities $K$, we run the *change_mind* function *num_hypothetical_draws* times, summing up the total number of times our minds are changed.
+Since the *change_mind* function returns a probabilistically generated result, we need to run the function many times to get a sense of how likely a given choice of cities $K$ will change our minds. Therefore, for each possible subset of cities $K$, we run the *change_mind* function *num_draws* times, summing up the total number of times our minds are changed.
 
 The code for this final step is below
 ```{r, results="hide", warning = FALSE}
@@ -232,9 +232,9 @@ combinations <-combn(seq(I),num_pilots)
 # Initiate number of minds changed (nmc) to zero
 nmc <- numeric(ncol(combinations))
 
-# Loop through all combinations K, updating nmc num_hypothetical_draws times
+# Loop through all combinations K, updating nmc num_draws times
 for (i in 1:ncol(combinations)){
-  for (j in 1:num_hypothetical_draws){
+  for (j in 1:num_draws){
     K <- combinations[,i]
     nmc[i] <- nmc[i] + change_mind(K,Y,original_rank)
   }
@@ -246,7 +246,7 @@ So what are the results? We print them here.
 print(Y)
 for (i in 1:length(nmc)){
   print(combinations[,i])
-  print(paste("Number of times minds changed: ",nmc[i],"/",num_hypothetical_draws))
+  print(paste("Number of times minds changed: ",nmc[i],"/",num_draws))
 } 
 ```
 

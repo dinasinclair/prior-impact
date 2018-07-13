@@ -29,7 +29,7 @@ extract_fit<- function(basic_dat_generated){
 }
 
 # Calculate new data for all K new pilots
-get_pilot_results <- function(K,Y,Q){
+get_pilot_results <- function(K,Y,Q=1){
   # Before update, Y_P is the same as Y
   Y_P <- Y
   
@@ -64,19 +64,20 @@ new_ranking <- function(fit_updated,Y_P) {
   return(new_rank)
 }
 
-change_mind <- function(K,Y,original_rank,num_final_cities,I,Q){
+change_mind <- function(K,Y,original_rank,num_final_cities,Q=1){
   # This function returns TRUE if the pilots run in K change the final actions
   # and returns FALSE otherwise, given original ranking and data Y.
   
   # Simulate pilots
   Y_P <- get_pilot_results(K,Y,Q)
   # Update thetas
-  updated_dat_generated <- list(I, Y=Y_P$mean, sigmaSq=Y_P$var)
+  updated_dat_generated <- list(I=length(Y$mean), Y=Y_P$mean, sigmaSq=Y_P$var)
   fit_updated <- stan(file = 'randomEffectsModel1D.stan', 
                       data = updated_dat_generated, 
                       iter = 1000, chains = 2)
   # Use new thetas to get a new city ranking
   new_rank <- new_ranking(fit_updated,Y_P) 
+  print(new_rank)
   # Take the top F cities from each ranking as final city choice
   original_choice <- original_rank[1:num_final_cities]
   new_choice <- new_rank[1:num_final_cities]
@@ -84,7 +85,7 @@ change_mind <- function(K,Y,original_rank,num_final_cities,I,Q){
   return(!setequal(original_choice,new_choice))
 }
 
-overall<-function(I, SF, num_pilots,num_final_cities,num_hypothetical_draws,Q,seed,mu,tau){
+overall<-function(I,SF,num_pilots,num_final_cities,num_draws,mu,tau,Q=1,seed=17){
   
   set.seed(seed)
   basic_dat_generated <- generate_basic(I,SF,mu,tau)
@@ -101,9 +102,9 @@ overall<-function(I, SF, num_pilots,num_final_cities,num_hypothetical_draws,Q,se
   # Initiate number of minds changed (nmc) to zero
   nmc <- numeric(ncol(combinations))
   
-  # Loop through all combinations K, updating nmc num_hypothetical_draws times
+  # Loop through all combinations K, updating nmc num_draws times
   for (i in 1:ncol(combinations)){
-    for (j in 1:num_hypothetical_draws){
+    for (j in 1:num_draws){
       print("i is")
       print(i)
       K <- combinations[,i]
@@ -117,8 +118,9 @@ overall<-function(I, SF, num_pilots,num_final_cities,num_hypothetical_draws,Q,se
   print(combinations)
   for (i in 1:length(nmc)){
     print(combinations[,i])
-    print(paste("Number of times minds changed: ",nmc[i],"/",num_hypothetical_draws))
+    print(paste("Number of times minds changed: ",nmc[i],"/",num_draws))
   } 
+  return(nmc)
 }
 
 # data <- list(I=2,Y=c(2,2),sigmaSq=c(1,1))
@@ -128,7 +130,7 @@ overall<-function(I, SF, num_pilots,num_final_cities,num_hypothetical_draws,Q,se
 #         SF=1,
 #         num_pilots=3,
 #         num_final_cities=2,
-#         num_hypothetical_draws=1,
+#         num_draws=1,
 #         Q=5,
 #         seed=17,
 #         mu=2,
@@ -138,6 +140,9 @@ overall<-function(I, SF, num_pilots,num_final_cities,num_hypothetical_draws,Q,se
 # Y_P <- get_pilot_results(K=c(1,2),Y=Y,Q=1)
 # Y
 # Y_P
+# 
+# Y <- list(mean = c(-1000,0,0,0), var = c(1,1,1,1))
+# change_mind(K=c(1),Y,original_rank=c(1,2,3,4),num_final_cities=1,I=4,Q=1)
 
-Y <- list(mean = c(-1000,0,0,0), var = c(1,1,1,1))
-change_mind(K=c(1),Y,original_rank=c(1,2,3,4),num_final_cities=1,I=4,Q=1)
+# Y <- list(mean = c(0,0,0,0,0,0,0), var = c(100,100,100,100,100,100,100))
+# change_mind(K=c(2,3,4,5,6,7),Y,original_rank=c(1,2,3,4,5,6,7),num_final_cities=1)
