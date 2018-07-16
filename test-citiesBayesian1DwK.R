@@ -1,6 +1,7 @@
 # Test file for Bayesian Cities 1D file
 library("metafor")
 source('citiesBayesian1DwK.R')
+set.seed(17)
 
 context('testing generate_basic')
 
