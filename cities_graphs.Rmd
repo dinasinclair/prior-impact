@@ -1,0 +1,99 @@
+---
+title: "City Graphs"
+author: "Dina Sinclair"
+date: "July 17, 2018"
+output: html_document
+---
+
+```{r}
+source('citiesBayesian1DwK.R')
+set.seed(17)
+```
+
+```{r}
+N <- 16
+pilot_c1 <- numeric(N)
+pilot_c2 <- numeric(N)
+record_i <- numeric(N)
+sample <- seq(0,1.5,length.out = N)
+
+for (i in 1:N){
+  data <- list(I=2,Y=c(sample[i],0),sigmaSq=c(1,1))
+  results <- overall(data=data,num_pilots=1,num_final_cities=1,num_draws=100)
+  pilot_c1[i] <- results$nmc[1]
+  pilot_c2[i] <- results$nmc[2]
+  print(i)
+  print(sample[i])
+  
+}
+
+df <- data.frame(sample, pilot_c1, pilot_c2)
+save(df, file="testing_mean.Rda")
+
+# I messed up and needed to save these by hand at some point, so here they are 
+# pilot_c1 <- c(49, 42, 43, 35, 34, 41, 32, 21, 12,  8, 17, 15,  6,  2, 14,  2)
+# pilot_c2 <- c(54, 56, 41, 37, 22, 35, 22, 18, 14,  9,  9, 13,  7,  1,  9,  4)
+```
+Actual output:
+```{r}
+load("testing_mean.Rda")
+g <- ggplot(df, aes(sample))        
+g <- g + geom_line(aes(y=pilot_c1), colour="blue")# basic graphical object
+g <- g + geom_line(aes(y=pilot_c1), colour="blue") + geom_point(aes(y=pilot_c1), colour="blue")  # first layer
+g <- g + geom_line(aes(y=pilot_c2), colour="green") + geom_point(aes(y=pilot_c2), colour="green") # second layer
+g <- g + ylab("Percentage of Times Mind Changed") + xlab("Difference Between Initial Means (x)")
+g <- g + labs(title="Percentage of Minds Changed vs Distance Betweeen Initial Means")
+g
+```
+Here, we've run a case where there are only two cities to chose from, we can run a pilot in only one city, and we can run the final program in only one city. City 1 has an initial prior $Y_1 \sim (0,1)$ and city 2 has an initial prior $Y_2 \sim (x,1)$ where $x$ ranges from 0 to 1.5. Each simulation has been run 100 times, and the number of times changing the initial ranking (deciding to go for city 2 rather than city 1) has been plotted as the percentage of times we changed our minds (y). As expected, as the means grow farther apart, it becomes less and less likely that a pilot study will change our minds.
+
+```{r}
+Q_val <- c(0.25,0.5,1,2,4,8,16)
+N <- length(Q_val)
+pilot_c1 <- numeric(N)
+pilot_c2 <- numeric(N)
+
+for (i in 1:N){
+  data <- list(I=2,Y=c(1,0),sigmaSq=c(1,1))
+  results <- overall(data=data,num_pilots=1,num_final_cities=1,num_draws=100,Q=Q_val[i])
+  pilot_c1[i] <- results$nmc[1]
+  pilot_c2[i] <- results$nmc[2]
+  print(sample[i])
+}
+
+df <- data.frame(Q_val, pilot_c1, pilot_c2)
+save(df, file="testing_Q.Rda")
+df
+```
+```{r}
+load("testing_Q.Rda")
+g <- ggplot(df, aes(Q_val))        
+g <- g + geom_line(aes(y=pilot_c1), colour="blue") + geom_point(aes(y=pilot_c1), colour="blue")  # first layer
+g <- g + geom_line(aes(y=pilot_c2), colour="green") + geom_point(aes(y=pilot_c2), colour="green") # second layer
+g <- g + ylab("Percentage of Times Mind Changed") + xlab("Q Value")
+g <- g + labs(title="Percentage of Minds Changed vs Q value")
+g
+```
+
+```{r}
+Q_val <- c(0.25,0.5,1,1.5,2,4,8,16)
+Q <- length(Q_val)
+N <- 11
+pilot_c1 <- matrix(nrow = N, ncol = Q)
+pilot_c2 <- matrix(nrow = N, ncol = Q)
+sample <- seq(0,1,length.out = N)
+
+for (n in 1:N){
+  for (q in 1:Q){
+    data <- list(I=2,Y=c(sample[n],0),sigmaSq=c(1,1))
+    results <- overall(data=data,num_pilots=1,num_final_cities=1,num_draws=1,Q=Q_val[q])
+    pilot_c1[n,q] <- results$nmc[1]
+    pilot_c2[n,q] <- results$nmc[2]
+  }
+}
+
+df <- data.frame(Q_val, pilot_c1, pilot_c2)
+save(df, file="testing_Q_and_mean.Rda")
+df
+```
+
