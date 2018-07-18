@@ -19,7 +19,7 @@ extract_fit<- function(data){
   Y <- list(mean = data$Y, var = data$sigmaSq)
   fit <- stan(file = 'randomEffectsModel1D.stan', 
               data = data, 
-              iter = 1000, chains = 2, control=list(adapt_delta=0.80, max_treedepth=10))
+              iter = 1000, chains = 2, control=list(adapt_delta=0.99, max_treedepth=10))
   #pairs(fit)
   
   # Readjust knowledge of Y based on REM
@@ -113,5 +113,8 @@ overall<-function(data,num_pilots,num_final_cities,num_draws,Q=1){
   return(list(nmc=nmc, combinations=combinations))
 }
 
-#generate_basic(I=3,mu=0,tau=1,SF=1)
+data <- generate_basic(I=3,mu=0,tau=1,SF=1)
+fit <- stan(file = 'randomEffectsModel1D.stan', 
+            data = data, 
+            iter = 1000, chains = 2)
 

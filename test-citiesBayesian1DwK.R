@@ -1,6 +1,6 @@
 # Test file for Bayesian Cities 1D file
 library("metafor")
-source('citiesBayesian1DwK.R')
+source("C:/Users/Dina/Documents/Oxford/Evaluating Prior Impact/cities_main_code.R")
 set.seed(17)
 
 context('testing generate_basic')
