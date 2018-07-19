@@ -3,8 +3,8 @@ title: "City Graphs"
 author: "Dina Sinclair"
 date: "July 17, 2018"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r, results="hide", warning=FALSE}
@@ -133,7 +133,8 @@ N <- 11 # Number of different tau values
 pilot_c1 <- matrix(nrow = N, ncol = J)
 pilot_c2 <- matrix(nrow = N, ncol = J)
 sample <- seq(0,2,length.out = N)
-
+```
+```{r, eval=FALSE}
 for (n in 1:N){
   for (j in 1:J){
     data <-generate_basic(I=2,mu=0,tau=sample[n],SF=1)
@@ -148,24 +149,29 @@ save(pilot_c2, file = "tau_c2.Rdata")
 ```
 ```{r}
 load("tau_c1.Rdata")
-longData<-melt(pilot_c1)
-
-ggplot(longData, aes(x = Var2, y = Var1)) +
-  geom_raster(aes(fill=value)) +
-  scale_fill_gradient(low="grey90", high="red") +
-  labs(title="Minds Changed (Out of 10) if Pilot City 1") +
-  scale_x_discrete(name ="Trial Number", limits=as.character(seq(1,J))) +
-  scale_y_discrete(name ="Tau Value", limits=as.character(sample))
-```
-```{r}
-load("tau_c2.Rdata")
-longData<-melt(pilot_c2)
+with_avg <- cbind(pilot_c1,rowMeans(pilot_c1))
+longData<-melt(with_avg)
 
 ggplot(longData, aes(x = Var2, y = Var1)) +
   geom_raster(aes(fill=value)) +
   scale_fill_gradient(low="grey90", high="red") +
   labs(title="Minds Changed (Out of 10) if Pilot City 2") +
-  scale_x_discrete(name ="Trial Number", limits=as.character(seq(1,J))) +
+  scale_x_discrete(name ="Trial Number", limits=c(as.character(seq(1,J)),"avg")) +
+  scale_y_discrete(name ="Tau Value", limits=as.character(sample))
+```
+
+Here we're looking at the effect of changing tau on the number of minds changed. Tau has been tested in the range of 0-2. For each tau value, we generate 10 different initial data trials, and for each of those trials, run 10 pilot simlations. The average result of each of the 10 tau trials is captured in the rightmost column. The scenario here deals with 2 possible cities, one pilot city, and one city to choose as the final city. Here we plot the number of times we change our minds (out of 10 possible opportunities) if we pilot city 1. We'd expect the plot for the times we pilot city 2(below) to be comparable, in that city 1 and city 2 are generated from the same distribution N(mu=0, tau2).
+
+```{r}
+load("tau_c2.Rdata")
+with_avg <- cbind(pilot_c2,rowMeans(pilot_c2))
+longData<-melt(with_avg)
+
+ggplot(longData, aes(x = Var2, y = Var1)) +
+  geom_raster(aes(fill=value)) +
+  scale_fill_gradient(low="grey90", high="red") +
+  labs(title="Minds Changed (Out of 10) if Pilot City 2") +
+  scale_x_discrete(name ="Trial Number", limits=c(as.character(seq(1,J)),"avg")) +
   scale_y_discrete(name ="Tau Value", limits=as.character(sample))
 ```
 
