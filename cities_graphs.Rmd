@@ -18,7 +18,6 @@ set.seed(17)
 N <- 16
 pilot_c1 <- numeric(N)
 pilot_c2 <- numeric(N)
-record_i <- numeric(N)
 sample <- seq(0,1.5,length.out = N)
 
 for (i in 1:N){
@@ -127,3 +126,46 @@ ggplot(longData, aes(x = Var2, y = Var1)) +
 ```
 
 Here we're trying to visualize how changing both the difference between the means of the two cities and the variance of the pilot studies (described by Q, with Q=3 implying the pilot variance is 1/3 of the original study variance). City 1 has prior mean x ranging fro 0 to 1 while city 2 has prior mean 0; both have prior variance 1. Here we can see that as the cities have closer means and the variance of the pilot study becomes larger, we're more likely to change our minds, as one would expect. Each square in this matrix represents the results of running the same simulation 10 times, counting the total number of times out of 10 that our mind is changed away from choosing city 1 as the final program destination, given that we choose to implement the pilot in city 2.
+
+```{r}
+J <- 10 # Number of times we retry per tau
+N <- 11 # Number of different tau values
+pilot_c1 <- matrix(nrow = N, ncol = J)
+pilot_c2 <- matrix(nrow = N, ncol = J)
+sample <- seq(0,2,length.out = N)
+
+for (n in 1:N){
+  for (j in 1:J){
+    data <-generate_basic(I=2,mu=0,tau=sample[n],SF=1)
+    results <- overall(data=data,num_pilots=1,num_final_cities=1,num_draws=10)
+    pilot_c1[n,j] <- results$nmc[1]
+    pilot_c2[n,j] <- results$nmc[2]
+  }
+}
+
+save(pilot_c1, file = "tau_c1.Rdata")
+save(pilot_c2, file = "tau_c2.Rdata")
+```
+```{r}
+load("tau_c1.Rdata")
+longData<-melt(pilot_c1)
+
+ggplot(longData, aes(x = Var2, y = Var1)) +
+  geom_raster(aes(fill=value)) +
+  scale_fill_gradient(low="grey90", high="red") +
+  labs(title="Minds Changed (Out of 10) if Pilot City 1") +
+  scale_x_discrete(name ="Trial Number", limits=as.character(seq(1,J))) +
+  scale_y_discrete(name ="Tau Value", limits=as.character(sample))
+```
+```{r}
+load("tau_c2.Rdata")
+longData<-melt(pilot_c2)
+
+ggplot(longData, aes(x = Var2, y = Var1)) +
+  geom_raster(aes(fill=value)) +
+  scale_fill_gradient(low="grey90", high="red") +
+  labs(title="Minds Changed (Out of 10) if Pilot City 2") +
+  scale_x_discrete(name ="Trial Number", limits=as.character(seq(1,J))) +
+  scale_y_discrete(name ="Tau Value", limits=as.character(sample))
+```
+
