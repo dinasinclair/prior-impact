@@ -1,4 +1,5 @@
 library("rstan")
+library("brms")
 
 generate_basic <- function(I,mu,tau,SF=1){
   
@@ -20,6 +21,26 @@ extract_fit<- function(data){
   fit <- stan(file = 'randomEffectsModel1D.stan', 
               data = data, 
               iter = 1000, chains = 2, control=list(adapt_delta=0.80, max_treedepth=10))
+  #pairs(fit)
+  
+  # Readjust knowledge of Y based on REM
+  params <- extract(fit)
+  for (i in 1:length(Y$mean)){
+    Y$mean[i] <- mean(params$theta[,i])
+  }
+  return(list(Y=Y,mu=mean(params$mu), tau=mean(params$tau)))
+}
+
+extract_fit_brms<- function(data){
+  # data has the form list(I=I,Y=Y$mean,sigmaSq=Y$var)
+  Y <- list(mean = data$Y, var = data$sigmaSq)
+  
+  # Okay now the data does not have to be in the weird list form. we do need
+  # Y_city ~ (mu|city) + (error|city) + population-wide effects
+  # mu for each, group(city) for each, error for each, Y city as output
+  fit <- brm(Y_new ~ Y|mu, 
+              data = data, 
+              family = lognormal)
   #pairs(fit)
   
   # Readjust knowledge of Y based on REM
