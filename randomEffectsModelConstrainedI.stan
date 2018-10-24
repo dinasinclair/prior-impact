@@ -1,3 +1,6 @@
+// A one layer hierarchical model with I studies of constant
+// but alterable size J.
+
 data {
   int<lower=0> J; // number of individuals per study
   int<lower=0> I; // number of studies

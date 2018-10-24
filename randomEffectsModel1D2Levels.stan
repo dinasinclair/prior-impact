@@ -1,5 +1,5 @@
-// A one layer hierarchical model with I studies of fixed size
-// J=1.
+// A two layer hierarchical model with I studies of fixed size
+// J. TODO this is currently starter code from the 1D model.
 
 data {
   int<lower=0> I; // number of studies

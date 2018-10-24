@@ -1,5 +1,5 @@
 // A one layer hierarchical model with I studies of fixed size
-// J=1.
+// J.
 
 data {
   int<lower=0> I; // number of studies
