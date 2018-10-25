@@ -5,17 +5,22 @@ data {
   int<lower=0> I; // number of studies
   real Y[I]; // data points from study i individual j
   real<lower=0> sigmaSq[I]; // var of effect estimates 
+  int<lower=0> g[I]; // Group assignment of each study
+  int<lower=0> G; // Number of groups
 }
 parameters {
-  real mu; 
-  real<lower=0> tau;
-  real theta[I];
+  real mu; // population mean
+  real<lower=0> tau; // population s.d.
+  real eta[G]; // group level errors
 }
 transformed parameters {
+real theta[G]; // Group effects
+for (x in 1:G)
+  theta[x] = mu + tau * eta[x];
 }
 model {
+  target += normal_lpdf(eta | 0,1); // clarify, is this total effect?
   for (i in 1:I){
-    target += normal_lpdf(theta[i] | mu, tau^2);
-    target += normal_lpdf( Y[i] | theta[i], sigmaSq[i]);
+    y[i] ~ normal(theta[g[i]], sigmaSq[i])
   }
 }
