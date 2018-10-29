@@ -4,7 +4,7 @@
 data {
   int<lower=0> I; // number of studies
   real Y[I]; // data points from study i individual j
-  real<lower=0> sigmaSq[I]; // var of effect estimates 
+  real<lower=0> sigma[I]; // var of effect estimates 
   int<lower=0> g[I]; // Group assignment of each study
   int<lower=0> G; // Number of groups
 }
@@ -21,6 +21,6 @@ for (x in 1:G)
 model {
   target += normal_lpdf(eta | 0,1);
   for (i in 1:I){
-    y[i] ~ normal(theta[g[i]], sigmaSq[i])
+    y[i] ~ normal(theta[g[i]], sigma[i])
   }
 }
