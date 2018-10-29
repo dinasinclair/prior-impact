@@ -1,5 +1,5 @@
 // A two layer hierarchical model with I studies of fixed size
-// J. TODO this is currently starter code from the 1D model.
+// J. Used https://discourse.mc-stan.org/t/simple-question-on-hierarchical-non-centered-parameterization/2216 to help think through the correct coding strategy.
 
 data {
   int<lower=0> I; // number of studies
@@ -19,7 +19,7 @@ for (x in 1:G)
   theta[x] = mu + tau * eta[x];
 }
 model {
-  target += normal_lpdf(eta | 0,1); // clarify, is this total effect?
+  target += normal_lpdf(eta | 0,1);
   for (i in 1:I){
     y[i] ~ normal(theta[g[i]], sigmaSq[i])
   }
