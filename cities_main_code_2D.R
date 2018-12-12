@@ -1,56 +1,51 @@
-# This code uses a one layer model ((sigma,mu) directly affect each of the Yi)
-# to look at the most basic case of our model where no grouping occurs.
-# This file contains functions that will generate initial data, extract fits,
-# calculate pretend pilot data, and check how much we "change our minds".
+# This file creates data for a two-layer fit with one grouping level.
+# It generates fake data, extracts a fit from that data. TODO split
+# this into several files? This seems like way too many things to all be 
+# sitting in the same place. But first, need to be testable.
 
-# This file also has an extract_fit_brms function for when I was trying to
-# use brms and it didn't work. TODO record that knowledge somewhere, delete 
-# the brms part.
 
 library("rstan")
-library("brms")
 
-generate_basic <- function(I,mu,tau,SF=1){
+generate_grouped_basic <- function(I,mu,tau,N,SF=1){
+  # ARGUMENTS
+  # I is the number of experiments (data points)
+  # mu/tau are the overall mean/SD
+  # N is the number of groups
+  # SF is the sigma factor, how wide spread we expect sigma to be
   
-  # Generate theta and sigmaSq
-  theta <- rnorm(I, mean = mu, sd = tau) # with theta ~ N(mu,tau)
-  sigmaSq <- SF*runif(I) # with sigmaSq ~ U(0,1)
-  Y <- list(mean=theta, var=sigmaSq)
+  # Generate mu/tau for each group
+  mu_groups <- rnorm(N, mean = mu, sd = tau) # with theta ~ N(mu,tau)
+  tau_groups <- SF*runif(N) # with sigmaSq ~ U(0,1) #TODO I should switch this to a normal with var~SF, right??
+  G <- list(mu = mu_groups, tau=tau_groups)
+  
+  # Generate mu/tau for each study under a group
+  group_assignment <- sample(1:N, I, replace=T)
+  mu_studies <- numeric(I)
+  tau_studies <- SF*runif(I)
+  for (i in 1:I){
+    mu_studies[i] <- rnorm(1,mean = G$mu[group_assignment[i]], sd = G$tau[group_assignment[i]])
+  }
+  Y <- list(mu = mu_studies, tau = tau_studies)
   
   # Save our generated input data together in a list
-  basic_dat_generated <- list(I=I,Y=Y$mean,sigmaSq=Y$var)
+  basic_dat_generated <- list(I=I,
+                              N=N,
+                              Y_mean = Y$mu,
+                              Y_sd = Y$tau,
+                              groups=group_assignment)
   
   # Display what we've generated
   return(basic_dat_generated)
 }
 
 extract_fit<- function(data){
-  # data has the form list(I=I,Y=Y$mean,sigmaSq=Y$var)
-  Y <- list(mean = data$Y, var = data$sigmaSq)
-  fit <- stan(file = 'randomEffectsModel1D.stan', 
+
+  fit <- stan(file = 'randomEffectsModel2D.stan', 
               data = data, 
               iter = 1000, chains = 2, control=list(adapt_delta=0.99, max_treedepth=10))
   #pairs(fit)
   
-  # Readjust knowledge of Y based on REM
-  params <- extract(fit)
-  for (i in 1:length(Y$mean)){
-    Y$mean[i] <- mean(params$theta[,i])
-  }
-  return(list(Y=Y,mu=mean(params$mu), tau=mean(params$tau)))
-}
-
-extract_fit_brms<- function(data){
-  # data has the form list(I=I,Y=Y$mean,sigmaSq=Y$var)
-  Y <- list(mean = data$Y, var = data$sigmaSq)
-  
-  # Okay now the data does not have to be in the weird list form. we do need
-  # Y_city ~ (mu|city) + (error|city) + population-wide effects
-  # mu for each, group(city) for each, error for each, Y city as output
-  fit <- brms(Y_new ~ Y|mu, 
-              data = data, 
-              family = lognormal)
-  #pairs(fit)
+  Y <- data$Y
   
   # Readjust knowledge of Y based on REM
   params <- extract(fit)
@@ -75,7 +70,7 @@ get_pilot_results <- function(K,Y,Q=1){
     post_pilot <- update_Y(Y$mean[k],new_mean,Y$var[k],new_sigmaSq)
     Y_P$mean[k] <- post_pilot$mean
     Y_P$var[k] <- post_pilot$var
-
+    
   }
   return(Y_P)
 }
@@ -119,7 +114,7 @@ change_mind <- function(K,Y,original_rank,num_final_cities,Q=1){
 }
 
 overall<-function(data,num_pilots,num_final_cities,num_draws,Q=1){
-
+  
   # Do initial REM fit
   Y <- extract_fit(data)$Y
   
@@ -128,7 +123,7 @@ overall<-function(data,num_pilots,num_final_cities,num_draws,Q=1){
   
   # Generate all combinations of cities $K$, store them in vector 'combinations'
   combinations <-combn(seq(data$I),num_pilots)
-
+  
   # Initiate number of minds changed (nmc) to zero
   nmc <- numeric(ncol(combinations))
   
@@ -143,8 +138,13 @@ overall<-function(data,num_pilots,num_final_cities,num_draws,Q=1){
   return(list(nmc=nmc, combinations=combinations))
 }
 
-data <- generate_basic(I=3,mu=0,tau=1,SF=1)
-fit <- stan(file = 'randomEffectsModel1D.stan', 
+data <- generate_grouped_basic(I=10,mu=0,tau=10,N=3, SF=1)
+fit <- stan(file = 'randomEffectsModel2D.stan', 
             data = data, 
             iter = 1000, chains = 2)
+
+# data <- generate_basic(I=3,mu=0,tau=1,SF=1)
+# fit <- stan(file = 'randomEffectsModel1D.stan', 
+#             data = data, 
+#             iter = 1000, chains = 2)
 

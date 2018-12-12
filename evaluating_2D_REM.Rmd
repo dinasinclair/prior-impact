@@ -1,0 +1,61 @@
+---
+title: "2DREM"
+author: "Dina Sinclair"
+date: "December 12, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library("rstan")
+
+generate_grouped_basic <- function(I,mu,tau,N,SF=1){
+  # ARGUMENTS
+  # I is the number of experiments (data points)
+  # mu/tau are the overall mean/SD
+  # N is the number of groups
+  # SF is the sigma factor, how wide spread we expect sigma to be
+  
+  # Generate mu/tau for each group
+  mu_groups <- rnorm(N, mean = mu, sd = tau) # with theta ~ N(mu,tau)
+  tau_groups <- SF*runif(N) # with sigmaSq ~ U(0,1) #TODO I should switch this to a normal with var~SF, right??
+  G <- list(mu = mu_groups, tau=tau_groups)
+  
+  # Generate mu/tau for each study under a group
+  group_assignment <- sample(1:N, I, replace=T)
+  mu_studies <- numeric(I)
+  tau_studies <- SF*runif(I)
+  for (i in 1:I){
+    mu_studies[i] <- rnorm(1,mean = G$mu[group_assignment[i]], sd = G$tau[group_assignment[i]])
+  }
+  Y <- list(mu = mu_studies, tau = tau_studies)
+  
+  # Save our generated input data together in a list
+  basic_dat_generated <- list(I=I,
+                              N=N,
+                              Y_mean = Y$mu,
+                              Y_sd = Y$tau,
+                              groups=group_assignment)
+  
+  # Display what we've generated
+  return(basic_dat_generated)
+}
+data <- generate_grouped_basic(I=10,mu=0,tau=10,N=3, SF=1)
+data
+```
+
+
+```{r cars}
+fit <- stan(file = 'randomEffectsModel2D.stan', 
+            data = data, 
+            iter = 1000, chains = 2)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
