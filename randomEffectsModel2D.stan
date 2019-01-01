@@ -3,24 +3,30 @@
 
 data {
   int<lower=0> I; // number of studies
-  real Y[I]; // data points from study i individual j
-  real<lower=0> sigma[I]; // var of effect estimates 
-  int<lower=0> g[I]; // Group assignment of each study
-  int<lower=0> G; // Number of groups
+  int<lower=0> N; // Number of groups
+  real Y_mean[I]; // mean from study i 
+  real<lower=0> Y_sd[I]; // sd from study i
+  int<lower=0> groups[I]; // Group assignment of each study i
+
 }
 parameters {
   real mu; // population mean
   real<lower=0> tau; // population s.d.
-  real eta[G]; // group level errors
+  real G_mean[N]; // mean from group g
+  real<lower=0> G_sd[N]; // sd from group g
 }
 transformed parameters {
-real theta[G]; // Group effects
-for (x in 1:G)
-  theta[x] = mu + tau * eta[x];
 }
 model {
-  target += normal_lpdf(eta | 0,1);
+  // First calculate group mean/sd
+  for (n in 1:N){
+    target += normal_lpdf(G_mean[n]| mu, tau);
+    target += lognormal_lpdf(G_sd[n] | 0, 1);
+  }
+
+  // Then calculate study mean/sd based on mu
   for (i in 1:I){
-    y[i] ~ normal(theta[g[i]], sigma[i])
+      target += normal_lpdf(Y_mean[i] | G_mean[groups[i]], G_sd[groups[i]]);
+      target += lognormal_lpdf(Y_sd[i] | 0, 1);
   }
 }
