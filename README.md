@@ -10,11 +10,13 @@ cities are not grouped in any way, and we use a one-layer random effects model. 
 cities are grouped together through some predetermined underlying structure, and we use a two-layer random effects model.
 
 The repo contains the following files/folders:
-* CitiesMainCode.R files, which run the full analysis from data generation to the question "how frequently do we change our minds if
+* **CitiesMainCode.R files**, which run the full analysis from data generation to the question "how frequently do we change our minds if
 we run the pilot on this city subset"
-* RandomEffectsModel.stan files, which contain the underlying random effects model bayesian hierarchical code called 
+* **RandomEffectsModel.stan files**, which contain the underlying random effects model bayesian hierarchical code called 
 in CitiesMainCode.R files.
-* EvaluatingConvergence.R files, which help visualize the results of the Stan REM models and determine if the models are converging 
+* **EvaluatingConvergence.R files**, which help visualize the results of the Stan REM models and determine if the models are converging 
 properly.
-* explanatory_code contains R markdown files and their corresponding pdfs walking through the code and math behind some of the main files.
-* single_layer_model_results contains R markdown files with graphs of results using the simpler 1D model.
+* **explanatory_code** contains R markdown files and their corresponding pdfs walking through the code and math behind some of the main files.
+* **single_layer_model_results** contains R markdown files with graphs of results using the simpler 1D model.
+* **presentations** contains slides for any presentations done on this work.
+* **old_code** contains initial code written for this project but no longer used.
