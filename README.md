@@ -1,8 +1,8 @@
 # prior-impact
 Using Bayesian modeling to better prioritize and access impact evaluations.
 
-This set of files examines the scenario: imagine you have $K$ cities in which you can implement a program, and you have
-priors on how well each city will perform. If you can do pilot studies to update those priors on a limited subset of the 
+This set of files examines the scenario: imagine you have *I* cities in which you can implement a program, and you have
+priors on how well each city will perform. If you can do pilot studies to update those priors on a limited subset *K* of the 
 possible cities, which cities should you perform the pilot in?
 
 To decide which cities to pilot, we use a bayesian hierarchical model coded in R and Stan. In the simplest (1D) case, the
