@@ -2,9 +2,14 @@
 title: "Bayesian Cities Model"
 author: "Dina Sinclair"
 date: "June 9, 2018"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
+This file aims to walk the reader through a 1 layer (1D) REM cities model where sample size per city $J$ is not constant.
+
+NOTE: This file is out of date but the intial matrix descriptions could be useful later.
 ```{r, warning = FALSE, message = FALSE}
 library("rstan")
 ```
@@ -68,7 +73,7 @@ We're assuming a **random effects model**, that is that $$\theta_i \sim N(\mu, \
 To make use of this assumption, we need to estimate scalars $\mu$ and $\tau^2$ along with the vector $\theta = (\theta_1,\dots,\theta_N)$. We can do this using stan!
 
 ```{r}
-fit <- stan(file = 'randomEffectsModelConstrainedI.stan', 
+fit <- stan(file = '../randomEffectsModel1D.stan', 
             data = basic_dat_generated, 
             iter = 1000, chains = 2)
 fit
@@ -176,7 +181,7 @@ and once we have all the updated $Y_i^U$ we can use them to get $\theta_i^U$ bas
 
 ```{r, eval = FALSE}
 updated_dat_generated <- list(J, I, Y_U, sigmaSq_U)
-fit_updated <- stan(file = 'randomEffectsModelConstrainedI.stan', 
+fit_updated <- stan(file = '../randomEffectsModel1D.stan', 
             data = updated_dat_generated, 
             iter = 1000, chains = 2)
 fit_updated

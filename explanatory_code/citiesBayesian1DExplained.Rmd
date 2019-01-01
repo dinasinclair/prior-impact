@@ -8,6 +8,8 @@ output:
 ---
 ### Overview
 
+This file walks through citiesMainCode1D.R.
+
 Imagine the following: as a policymaker, you want to implement a new program in a subset of cities. To improve your knowledge of which cities would benefit the most from the program, you have the budget to run a pilot in some of the potential city choices, but not all of them. Given that you have pre-existing beliefs (priors) on how well you think the program will fare in each city, where should you run the pilot to glean the most information?
 
 Here, we tackle this question using a bayseian hierarchical model coded in a combination of R and Stan.
