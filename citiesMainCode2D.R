@@ -1,51 +1,81 @@
 # This file creates data for a two-layer fit with one grouping level.
-# It generates fake data, extracts a fit from that data. TODO split
-# this into several files? This seems like way too many things to all be 
-# sitting in the same place. But first, need to be testable.
+# It generates fake data, extracts a fit from that data using a stan REM model.
+# TODO(dsinc): separate into different files
+# TODO(dsinc): add tests
 
 
 library("rstan")
 
-generate_grouped_basic <- function(I,mu,tau,N,SF=1){
-  # ARGUMENTS
-  # I is the number of experiments (data points)
-  # mu/tau are the overall mean/SD
-  # N is the number of groups
-  # SF is the sigma factor, how wide spread we expect sigma to be
+generateGroupedData <- function(I, mu, sd, N, SF=1){
+  # Generates example dataset where data is grouped into N groups.
+  # Note: Due to random group assignment some groups may have no data points assigned to them.
+  # 
+  # Arguments:
+  #   I: the number of data points (cities)
+  #   mu: the hyperparameter mean
+  #   sd: the hyperparameter standard deviation
+  #   N: the number of groups
+  #   SF: the sigma factor, how wide spread we expect sigma to be
+
+  # Generate mu/sd for each group
+  mu_groups <- rnorm(N, mean = mu, sd = sd) # with theta ~ N(mu,sd)
+  sd_groups <- SF * runif(N) # TODO(dsinc): correct sd generation to mirror stan code (lognormal?)
+  G <- list(mu = mu_groups, sd=sd_groups)
   
-  # Generate mu/tau for each group
-  mu_groups <- rnorm(N, mean = mu, sd = tau) # with theta ~ N(mu,tau)
-  tau_groups <- SF*runif(N) # with sigmaSq ~ U(0,1) #TODO I should switch this to a normal with var~SF, right??
-  G <- list(mu = mu_groups, tau=tau_groups)
-  
-  # Generate mu/tau for each study under a group
+  # Generate mu/sd for each study under a group
   group_assignment <- sample(1:N, I, replace=T)
   mu_studies <- numeric(I)
-  tau_studies <- SF*runif(I)
+  sd_studies <- SF*runif(I)
   for (i in 1:I){
-    mu_studies[i] <- rnorm(1,mean = G$mu[group_assignment[i]], sd = G$tau[group_assignment[i]])
+    mu_studies[i] <- rnorm(1,mean = G$mu[group_assignment[i]], sd = G$sd[group_assignment[i]])
   }
-  Y <- list(mu = mu_studies, tau = tau_studies)
+  Y <- list(mu = mu_studies, sd = sd_studies)
   
   # Save our generated input data together in a list
-  basic_dat_generated <- list(I=I,
+  generated_data <- list(I=I,
                               N=N,
                               Y_mean = Y$mu,
-                              Y_sd = Y$tau,
+                              Y_sd = Y$sd,
                               groups=group_assignment)
   
-  # Display what we've generated
-  return(basic_dat_generated)
+  # Save our generated input data together in a list
+  generated_data <- list(I = I,
+                         N = N,
+                         Y = Y,
+                         G = G,
+                         groups = group_assignment)
+  
+  # Return what we've generated
+  return(generated_data)
 }
 
-extract_fit<- function(data){
+parseGeneratedGroupedData <- function(generated_data){
+  # Given a data input, outputs the needed format for the stan file
+  # Save our generated input data together in a list
+  stan_input_data_format <- list(I = generated_data$I,
+                                 N = generated_data$N,
+                                 Y_mean = generated_data$Y$mu,
+                                 Y_sd = generated_data$Y$sd,
+                                 groups=generated_data$groups)
+  return(stan_input_data_format)
+}
 
+extract_fit <- function(data){
+  # This function returns the parameters backed out from the stan REM model. 
+  # 
+  # Arguments:
+  #   data: a list in the form list(I, N, Y_mean, Y_sd, groups)
+  # 
+  # Returns:
+  #   a list of parameters TODO(dsinc): clarify which parameters these are?
+  # TODO(dsinc): should this instead be a function that takes in a bunch of arguments rather than one list?
+  
   fit <- stan(file = 'randomEffectsModel2D.stan', 
               data = data, 
               iter = 1000, chains = 2, control=list(adapt_delta=0.99, max_treedepth=10))
   #pairs(fit)
   
-  Y <- data$Y
+  Y <- data$Y_mean
   
   # Readjust knowledge of Y based on REM
   params <- extract(fit)
@@ -138,7 +168,7 @@ overall<-function(data,num_pilots,num_final_cities,num_draws,Q=1){
   return(list(nmc=nmc, combinations=combinations))
 }
 
-data <- generate_grouped_basic(I=10,mu=0,tau=10,N=3, SF=1)
+data <- generateGroupedData(I=10,mu=0,tau=10,N=3, SF=1)
 fit <- stan(file = 'randomEffectsModel2D.stan', 
             data = data, 
             iter = 1000, chains = 2)

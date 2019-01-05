@@ -14,6 +14,7 @@ parameters {
   real<lower=0> tau; // population s.d.
   real G_mean[N]; // mean from group g
   real<lower=0> G_sd[N]; // sd from group g
+  real theta[I];
 }
 transformed parameters {
 }
@@ -26,7 +27,8 @@ model {
 
   // Then calculate study mean/sd based on mu
   for (i in 1:I){
-      target += normal_lpdf(Y_mean[i] | G_mean[groups[i]], G_sd[groups[i]]);
+      target += normal_lpdf(theta[i] | G_mean[groups[i]], G_sd[groups[i]]);
+      target += normal_lpdf( Y_mean[i] | theta[i],  Y_sd[I]);
       target += lognormal_lpdf(Y_sd[i] | 0, 1);
   }
 }

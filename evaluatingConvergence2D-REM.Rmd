@@ -8,43 +8,66 @@ output: html_document
 ```{r}
 library("rstan")
 
-generate_grouped_basic <- function(I,mu,tau,N,SF=1){
-  # ARGUMENTS
-  # I is the number of experiments (data points)
-  # mu/tau are the overall mean/SD
-  # N is the number of groups
-  # SF is the sigma factor, how wide spread we expect sigma to be
+generateGroupedData <- function(I, mu, sd, N, SF=1){
+  # Generates example dataset where data is grouped into N groups.
+  # Note: Due to random group assignment some groups may have no data points assigned to them.
+  # 
+  # Arguments:
+  #   I: the number of data points (cities)
+  #   mu: the hyperparameter mean
+  #   sd: the hyperparameter standard deviation
+  #   N: the number of groups
+  #   SF: the sigma factor, how wide spread we expect sigma to be
+
+  # Generate mu/sd for each group
+  mu_groups <- rnorm(N, mean = mu, sd = sd) # with theta ~ N(mu,sd)
+  sd_groups <- SF * runif(N) # TODO(dsinc): correct sd generation to mirror stan code (lognormal?)
+  G <- list(mu = mu_groups, sd=sd_groups)
   
-  # Generate mu/tau for each group
-  mu_groups <- rnorm(N, mean = mu, sd = tau) # with theta ~ N(mu,tau)
-  tau_groups <- SF*runif(N) # with sigmaSq ~ U(0,1) #TODO I should switch this to a normal with var~SF, right??
-  G <- list(mu = mu_groups, tau=tau_groups)
-  
-  # Generate mu/tau for each study under a group
+  # Generate mu/sd for each study under a group
   group_assignment <- sample(1:N, I, replace=T)
   mu_studies <- numeric(I)
-  tau_studies <- SF*runif(I)
+  sd_studies <- SF*runif(I)
   for (i in 1:I){
-    mu_studies[i] <- rnorm(1,mean = G$mu[group_assignment[i]], sd = G$tau[group_assignment[i]])
+    mu_studies[i] <- rnorm(1,mean = G$mu[group_assignment[i]], sd = G$sd[group_assignment[i]])
   }
-  Y <- list(mu = mu_studies, tau = tau_studies)
+  Y <- list(mu = mu_studies, sd = sd_studies)
   
   # Save our generated input data together in a list
-  basic_dat_generated <- list(I=I,
+  generated_data <- list(I=I,
                               N=N,
                               Y_mean = Y$mu,
-                              Y_sd = Y$tau,
+                              Y_sd = Y$sd,
                               groups=group_assignment)
   
-  # Display what we've generated
-  return(basic_dat_generated)
+  # Save our generated input data together in a list
+  generated_data <- list(I = I,
+                         N = N,
+                         Y = Y,
+                         G = G,
+                         groups = group_assignment)
+  
+  # Return what we've generated
+  return(generated_data)
 }
-data <- generate_grouped_basic(I=500,mu=0,tau=10,N=3)
-#data
+
+parseGeneratedGroupedData <- function(generated_data){
+  # Given a data input, outputs the needed format for the stan file
+  # Save our generated input data together in a list
+  stan_input_data_format <- list(I = generated_data$I,
+                                 N = generated_data$N,
+                                 Y_mean = generated_data$Y$mu,
+                                 Y_sd = generated_data$Y$sd,
+                                 groups=generated_data$groups)
+  return(stan_input_data_format)
+}
+data <- parseGeneratedGroupedData(generateGroupedData(I=10,mu=0,sd=10,N=3))
+
+data
 ```
 
 ```{r}
-fit <- stan(file = 'randomEffectsModel2D-new.stan', 
+fit <- stan(file = 'randomEffectsModel2D.stan', 
             data = data,
             control = list(adapt_delta = 0.99,max_treedepth = 15),
             iter = 1000, chains = 2)
@@ -55,7 +78,7 @@ fit
 I'm noticing that the mu/tau estimates aren't very good, even with 50 data points. Maybe try 500 or something --> even then, get my - -3.8 sd 50, tau=51 sd 90. Is that good or bad? Also, you see divergence in the data if you use one group, even if there are 50 data points in that group (don't see that divergence with 5 data points split among 3 groups, for example). But this does make things harder to test. Yeah why do I get so many divergent transitions when I make up numbers, ex below?
 ```{r}
 data <- list(I=5, N=2, Y_mean=c(0.1,0.001,0.011,0,0.01), Y_sd=c(.01,.01,.01,.01,.01), groups=c(1,2,1,1,2))
-fit <- stan(file = 'randomEffectsModel2D-new.stan', 
+fit <- stan(file = 'randomEffectsModel2D.stan', 
             data = data,
             control = list(adapt_delta = 0.99,max_treedepth = 15),
             iter = 1000, chains = 2)
