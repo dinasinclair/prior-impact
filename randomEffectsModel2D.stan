@@ -25,10 +25,9 @@ model {
     target += lognormal_lpdf(G_sd[n] | 0, 1);
   }
 
-  // Then calculate study mean/sd based on mu
+  // Then calculate study mean based on group results (we assume Y_sd is a known constant)
   for (i in 1:I){
       target += normal_lpdf(theta[i] | G_mean[groups[i]], G_sd[groups[i]]);
       target += normal_lpdf( Y_mean[i] | theta[i],  Y_sd[I]);
-      target += lognormal_lpdf(Y_sd[i] | 0, 1);
   }
 }

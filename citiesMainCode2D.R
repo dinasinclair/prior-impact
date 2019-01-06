@@ -2,6 +2,7 @@
 # It generates fake data, extracts a fit from that data using a stan REM model.
 # TODO(dsinc): separate into different files
 # TODO(dsinc): add tests
+# TODO(dsinc): decide on sd vs tau conventions plus make sure we're not mixing sd vs var
 
 
 library("rstan")
@@ -32,18 +33,7 @@ generateGroupedData <- function(I, mu, sd, N, SF=1){
   Y <- list(mu = mu_studies, sd = sd_studies)
   
   # Save our generated input data together in a list
-  generated_data <- list(I=I,
-                              N=N,
-                              Y_mean = Y$mu,
-                              Y_sd = Y$sd,
-                              groups=group_assignment)
-  
-  # Save our generated input data together in a list
-  generated_data <- list(I = I,
-                         N = N,
-                         Y = Y,
-                         G = G,
-                         groups = group_assignment)
+  generated_data <- list(I = I, N = N, Y = Y, G = G, groups = group_assignment)
   
   # Return what we've generated
   return(generated_data)
@@ -62,42 +52,54 @@ parseGeneratedGroupedData <- function(generated_data){
 
 extract_fit <- function(data){
   # This function returns the parameters backed out from the stan REM model. 
-  # 
+  # TODO(dsinc): should this instead be a function that takes in a bunch of arguments rather than one list?
+  #
   # Arguments:
   #   data: a list in the form list(I, N, Y_mean, Y_sd, groups)
   # 
   # Returns:
-  #   a list of parameters TODO(dsinc): clarify which parameters these are?
-  # TODO(dsinc): should this instead be a function that takes in a bunch of arguments rather than one list?
+  #   a list of updated parameters Y_mean Y_sd G_mean G_sd mu tau
   
   fit <- stan(file = 'randomEffectsModel2D.stan', 
               data = data, 
               iter = 1000, chains = 2, control=list(adapt_delta=0.99, max_treedepth=10))
-  #pairs(fit)
-  
-  Y <- data$Y_mean
   
   # Readjust knowledge of Y based on REM
   params <- extract(fit)
-  for (i in 1:length(Y$mean)){
+  Y <- list(mean = data$Y_mean, sd = data$Y_sd)
+  G<- list(mean = data$G_mean, sd = data$G_sd)
+  
+  for (i in 1:length(data$Y_mean)){
     Y$mean[i] <- mean(params$theta[,i])
   }
-  return(list(Y=Y,mu=mean(params$mu), tau=mean(params$tau)))
+  for (n in 1:length(data$groups)){
+    G$mean[n] <- mean(params$G_mean[,n])
+    G$sd[n] <- mean(params$G_sd[,n])
+  }
+  
+  return(list(Y = Y, G = G, mu = mean(params$mu), tau = mean(params$tau)))
 }
 
-# Calculate new data for all K new pilots
+
 get_pilot_results <- function(K,Y,Q=1){
-  # Before update, Y_P is the same as Y
+  # Calculate new data for all K new pilots
+  # 
+  # Arguments:
+  #   K: int number of pilot studies to perform
+  #   Y: (mu,sd) of all studies post first bayesian update
+  #   Q: Factor by which pilot data uncertainty is lower than original data uncertainty
+    
+  # Before update, initialize Y_P (the post-pilot results) to Y
   Y_P <- Y
   
   # Update for each new pilot k
   for (k in K){
-    # Gather New Pilot Data
-    new_sigmaSq <- Y$var[k] * (1/Q)
-    new_mean <- rnorm( 1 , mean = Y$mean[k] , sd = sqrt(new_sigmaSq ))
+    # Gather new pilot data
+    new_sd <- Y$sd[k] * (1/Q)
+    new_mean <- rnorm( 1, mean = Y$mean[k], sd = new_sd)
     
     # Combine the old and new data 
-    post_pilot <- update_Y(Y$mean[k],new_mean,Y$var[k],new_sigmaSq)
+    post_pilot <- update_Y(Y$mean[k], new_mean, Y$sd[k], new_sd)
     Y_P$mean[k] <- post_pilot$mean
     Y_P$var[k] <- post_pilot$var
     
@@ -168,13 +170,9 @@ overall<-function(data,num_pilots,num_final_cities,num_draws,Q=1){
   return(list(nmc=nmc, combinations=combinations))
 }
 
-data <- generateGroupedData(I=10,mu=0,tau=10,N=3, SF=1)
+data <- parseGeneratedGroupedData(generateGroupedData(I=10,mu=0,sd=10,N=3, SF=1))
 fit <- stan(file = 'randomEffectsModel2D.stan', 
             data = data, 
             iter = 1000, chains = 2)
 
-# data <- generate_basic(I=3,mu=0,tau=1,SF=1)
-# fit <- stan(file = 'randomEffectsModel1D.stan', 
-#             data = data, 
-#             iter = 1000, chains = 2)
-
+extract_fit(data)

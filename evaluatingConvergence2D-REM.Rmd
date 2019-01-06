@@ -71,7 +71,9 @@ fit <- stan(file = 'randomEffectsModel2D.stan',
             data = data,
             control = list(adapt_delta = 0.99,max_treedepth = 15),
             iter = 1000, chains = 2)
-pairs(fit)
+#pairs(fit)
+#fit
+params <- extract(fit)
 fit
 
 ```
