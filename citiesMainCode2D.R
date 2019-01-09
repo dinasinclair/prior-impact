@@ -1,9 +1,14 @@
 # This file creates data for a two-layer fit with one grouping level.
 # It generates fake data, extracts a fit from that data using a stan REM model.
+
+# DOCUMENTATION/CODE DEBT
 # TODO(dsinc): separate into different files
 # TODO(dsinc): add tests
 # TODO(dsinc): decide on sd vs tau conventions plus make sure we're not mixing sd vs var
-# TODO(dsinc): call it K or call it num_final_cities?
+# TODO(dsinc): call it K or call it num_final_cities? (K can mean the city set as opposed to the number...)
+
+# BUGS/CODE ERRORS
+# TODO(dsinc): for some reason R is recompiling every time it runs the stan model, which makes it WAY too slow.
 
 
 library("rstan")
@@ -31,7 +36,7 @@ generateGroupedData <- function(I, mu, sd, N, SF=1){
   for (i in 1:I){
     mu_studies[i] <- rnorm(1,mean = G$mu[group_assignment[i]], sd = G$sd[group_assignment[i]])
   }
-  Y <- list(mu = mu_studies, sd = sd_studies)rm(list = ls())
+  Y <- list(mu = mu_studies, sd = sd_studies)
   
   # Save our generated input data together in a list
   generated_data <- list(I = I, N = N, Y = Y, G = G, groups = group_assignment)
@@ -215,5 +220,4 @@ data <- parseGeneratedGroupedData(generateGroupedData(I=10,mu=0,sd=10,N=3, SF=1)
 #             iter = 1000, chains = 2)
 # 
 # extractFit(data)
-
-overall(data,3,2,4,Q=1)
+# overall(data,3,2,4,Q=1)
